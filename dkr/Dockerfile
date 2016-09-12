@@ -9,8 +9,9 @@ RUN apt-get update && \
 	apt-get install -y autotools-dev build-essential g++ libbz2-dev libicu-dev python-dev wget doxygen python3 python3-dev libboost-all-dev curl
 # P2P (seed) port
 EXPOSE 2001
-# RPC port
+# RPC ports
 EXPOSE 5000
+EXPOSE 8090
 
 ARG steemd_version=0.13.0-rc3
 
@@ -33,4 +34,4 @@ VOLUME /steem
 WORKDIR /steem
 
 RUN echo "Please configure me! You need to mount a data directory onto /steem of this container to it to function correctly. (if you're using Steem-in-a-box most of this is handled automatically)"
-CMD ["sh", "-c", "/usr/local/bin/steemd --replay-blockchain"]
+CMD ["sh", "-c", "/usr/local/bin/steemd --replay-blockchain --rpc-endpoint"]
