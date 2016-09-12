@@ -87,9 +87,9 @@ wallet() {
 
 logs() {
     echo $BLUE"DOCKER LOGS: "$RESET
-    docker logs --tail=20 $DOCKER_NAME
-    echo $RED"INFO AND DEBUG LOGS: "$RESET
-    tail -n 30 $DATADIR/{info.log,debug.log}
+    docker logs --tail=30 $DOCKER_NAME
+    #echo $RED"INFO AND DEBUG LOGS: "$RESET
+    #tail -n 30 $DATADIR/{info.log,debug.log}
 }
 
 status() {

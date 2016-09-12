@@ -32,4 +32,4 @@ RUN cd ~/steem && \
 
 WORKDIR /steem
 RUN echo "Please configure me! You need to mount a data directory onto /steem of this container to it to function correctly. (if you're using Steem-in-a-box most of this is handled automatically)"
-CMD ["sh", "-c", "/usr/local/bin/steemd --replay-blockchain 2>debug.log 1>>info.log"]
+CMD ["sh", "-c", "/usr/local/bin/steemd --replay-blockchain"]
