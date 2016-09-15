@@ -29,8 +29,9 @@ help() {
     echo "    stop - stops seed"
     echo "    status - show status of seed container"
     echo "    restart - restarts seed"
-    echo "    rebuild - builds seed, and then restarts it"
-    echo "    build - only builds seed"
+    echo "    install - pulls latest docker image from server (no compiling)"
+    echo "    rebuild - builds seed (from docker file), and then restarts it"
+    echo "    build - only builds seed (from docker file)"
     echo "    logs - show all logs inc. docker logs, and steem logs"
     echo "    wallet - open cli_wallet in the container"
     echo "    enter - enter a bash session in the container"
@@ -42,6 +43,18 @@ build() {
     echo $GREEN"Building docker container"$RESET
     cd $DOCKER_DIR
     docker build -t steem .
+}
+
+install() {
+    # step 1, get rid of old steem
+    echo "Stopping and removing any existing steem containers"
+    docker stop steem
+    docker rm steem
+    echo "Loading image from someguy123/steem"
+    docker pull someguy123/steem
+    echo "Tagging as steem"
+    docker tag someguy123/steem steem
+    echo "Installation completed. You may now configure or run the server"
 }
 
 seed_exists() {
@@ -120,7 +133,11 @@ fi
 
 case $1 in
     build)
+        echo "You may want to use '$0 install' for a binary image instead, it's faster."
         build
+        ;;
+    install)
+        install
         ;;
     start)
         start
