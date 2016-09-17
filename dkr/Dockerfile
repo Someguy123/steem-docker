@@ -13,7 +13,7 @@ EXPOSE 2001
 EXPOSE 5000
 EXPOSE 8090
 
-ARG steemd_version=0.13.0-rc3
+ARG steemd_version=v0.14.2
 
 RUN cd ~ && \
 	git clone https://github.com/steemit/steem.git && \
@@ -21,13 +21,7 @@ RUN cd ~ && \
 	git checkout ${steemd_version} && \
 	git submodule update --init --recursive
 #RUN cd ~/steem && export BOOST_ROOT=$HOME/opt/boost_1_60_0 && \
-# don't worry about this, only needed for cherry pick
-RUN git config --global user.email "you@example.com" && git config --global user.name "Your Name"
 RUN cd ~/steem && \
-# These cherry picks are required for 0.13 follow API to work
-        git cherry-pick 2096e96eb97e4c85c0c9445ff8f0156c5ac2a620 && \
-	git cherry-pick a8f34fe0e85aba4613037d895b02f3a108229b11 && \
-#	cmake -DBOOST_ROOT="$BOOST_ROOT" -DCMAKE_BUILD_TYPE=Release .
 	cmake -DCMAKE_BUILD_TYPE=Release . && \
 	make -j3 && make install
 VOLUME /steem
