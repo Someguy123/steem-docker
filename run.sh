@@ -19,19 +19,31 @@ CYAN="$(tput setaf 6)"
 WHITE="$(tput setaf 7)"
 RESET="$(tput sgr0)"
 
+# default. override in .env
+PORTS="2001"
 
+if [[ -f .env ]]; then
+    source .env
+fi
+
+
+IFS=","
+DPORTS=""
+for i in $PORTS; do
+    DPORTS="$DPORTS -p 0.0.0.0:$i:$i"
+done
 
 help() {
     echo "Usage: $0 COMMAND [DATA]"
     echo
     echo "Commands: "
-    echo "    start - starts seed"
-    echo "    stop - stops seed"
-    echo "    status - show status of seed container"
-    echo "    restart - restarts seed"
+    echo "    start - starts steem container"
+    echo "    stop - stops steem container"
+    echo "    status - show status of steem container"
+    echo "    restart - restarts steem container"
     echo "    install - pulls latest docker image from server (no compiling)"
-    echo "    rebuild - builds seed (from docker file), and then restarts it"
-    echo "    build - only builds seed (from docker file)"
+    echo "    rebuild - builds steem container (from docker file), and then restarts it"
+    echo "    build - only builds steem container (from docker file)"
     echo "    logs - show all logs inc. docker logs, and steem logs"
     echo "    wallet - open cli_wallet in the container"
     echo "    enter - enter a bash session in the container"
@@ -81,13 +93,13 @@ start() {
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
     else
-        docker run -p 0.0.0.0:2001:2001 -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem
+        docker run -p $DPORTS -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem
     fi
 }
 
 stop() {
     echo $RED"Stopping container..."$RESET
-    docker stop seed
+    docker stop $DOCKER_NAME
 }
 
 enter() {
