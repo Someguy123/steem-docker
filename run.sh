@@ -31,7 +31,11 @@ IFS=","
 DPORTS=""
 for i in $PORTS; do
     if [[ $i != "" ]]; then
-        DPORTS="$DPORTS -p 0.0.0.0:$i:$i"
+         if [[ $DPORTS == "" ]]; then
+            DPORTS="-p0.0.0.0:$i:$i"
+        else
+            DPORTS="$DPORTS -p0.0.0.0:$i:$i"
+        fi
     fi
 done
 
@@ -95,7 +99,7 @@ start() {
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
     else
-        docker run -p $DPORTS -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem
+        docker run $DPORTS -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem
     fi
 }
 
