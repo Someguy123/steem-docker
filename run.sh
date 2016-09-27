@@ -30,7 +30,9 @@ fi
 IFS=","
 DPORTS=""
 for i in $PORTS; do
-    DPORTS="$DPORTS -p 0.0.0.0:$i:$i"
+    if [[ $i != "" ]]; then
+        DPORTS="$DPORTS -p 0.0.0.0:$i:$i"
+    fi
 done
 
 help() {
