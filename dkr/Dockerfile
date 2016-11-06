@@ -24,7 +24,7 @@ RUN cd ~ && \
 #RUN cd ~/steem && export BOOST_ROOT=$HOME/opt/boost_1_60_0 && \
 RUN cd ~/steem && \
 	cmake -DCMAKE_BUILD_TYPE=Release . && \
-	make -j3 && make install && rm -rf ~/steem
+	make -j$(nproc) && make install && rm -rf ~/steem
 VOLUME /steem
 WORKDIR /steem
 
