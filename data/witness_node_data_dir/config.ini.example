@@ -4,13 +4,22 @@ p2p-endpoint = 0.0.0.0:2001
 # Maxmimum number of incoming connections on P2P endpoint
 # p2p-max-connections =
 
+# Shared file size
+shared-file-size = 12G
+
+# Target blocks to flush
+flush = 100000
+
 # P2P nodes to connect to on startup (may specify multiple times)
-seed-node = steem-seed1.abit-more.com:2001
-seed-node = 212.117.213.186:2016
-seed-node = seed.riversteem.com:2001
-seed-node = 52.74.152.79:2001
-seed-node = seed.steemd.com:34191
-seed-node = seed.steemnodes.com:2001
+seed-node = anyx.co:2001                # @anyx (CA)
+seed-node = gtg.steem.house:2001        # @gtg (PL)
+seed-node = seed.jesta.us:2001          # @jesta (US)
+seed-node = 212.117.213.186:2016        # @liondani (SWISS)
+seed-node = seed.riversteem.com:2001    # @riverhead (NL)
+seed-node = 52.74.152.79:2001           # @smooth (SG)
+seed-node = seed.steemd.com:34191       # @roadscape (US)
+seed-node = seed.steemnodes.com:2001    # @wackou (NL)
+
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
 # checkpoint =

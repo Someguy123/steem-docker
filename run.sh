@@ -26,6 +26,10 @@ if [[ -f .env ]]; then
     source .env
 fi
 
+if [[ ! -f data/witness_node_data_dir/config.ini ]]; then
+    echo "config.ini not found. copying example (seed)";
+    cp data/witness_node_data_dir/config.ini.example data/witness_node_data_dir/config.ini
+fi
 
 IFS=","
 DPORTS=""
