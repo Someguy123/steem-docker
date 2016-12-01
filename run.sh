@@ -61,6 +61,13 @@ help() {
     exit
 }
 
+optimize() {
+    echo    75 | sudo tee /proc/sys/vm/dirty_background_ratio
+    echo  1000 | sudo tee /proc/sys/vm/dirty_expire_centisecs
+    echo    80 | sudo tee /proc/sys/vm/dirty_ratio
+    echo 30000 | sudo tee /proc/sys/vm/dirty_writeback_centisecs
+}
+
 build() {
     echo $GREEN"Building docker container"$RESET
     cd $DOCKER_DIR
@@ -177,6 +184,10 @@ case $1 in
         sleep 5
         build
         start
+        ;;
+    optimize)
+        echo "Applying recommended dirty write settings..."
+        optimize
         ;;
     status)
         status
