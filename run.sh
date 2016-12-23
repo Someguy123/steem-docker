@@ -48,6 +48,8 @@ help() {
     echo
     echo "Commands: "
     echo "    start - starts steem container"
+    echo "    replay - starts steem container (in replay mode)"
+    echo "    shm_size - resizes /dev/shm to size given, e.g. ./run.sh shm_size 10G "
     echo "    stop - stops steem container"
     echo "    status - show status of steem container"
     echo "    restart - restarts steem container"
@@ -110,8 +112,21 @@ start() {
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
     else
-        docker run $DPORTS -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem
+        docker run $DPORTS -v /dev/shm:/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem
     fi
+}
+
+replay() {
+    echo "Removing old container"
+    docker rm $DOCKER_NAME
+    echo "Running steem with replay..."
+    docker run $DPORTS -v /dev/shm:/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --replay
+    echo "Started."
+}
+
+shm_size() {
+    echo "Setting SHM to $1"
+    mount -o remount,size=$1 /dev/shm
 }
 
 stop() {
@@ -170,6 +185,12 @@ case $1 in
         ;;
     start)
         start
+        ;;
+    replay)
+        replay
+        ;;
+    shm_size)
+        shm_size $2
         ;;
     stop)
         stop
