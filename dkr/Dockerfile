@@ -20,9 +20,8 @@ RUN cd ~ && \
 	git clone https://github.com/steemit/steem.git && \
 	cd steem && \
 	git checkout ${steemd_version} && \
-	git submodule update --init --recursive
-#RUN cd ~/steem && export BOOST_ROOT=$HOME/opt/boost_1_60_0 && \
-RUN cd ~/steem && \
+	git submodule update --init --recursive && \
+        cd ~/steem && \
 	cmake -DCMAKE_BUILD_TYPE=Release . && \
 	make -j$(nproc) && make install && rm -rf ~/steem
 VOLUME /steem
