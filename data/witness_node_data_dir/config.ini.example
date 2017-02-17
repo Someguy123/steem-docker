@@ -6,6 +6,7 @@ p2p-endpoint = 0.0.0.0:2001
 
 # Shared file size
 shared-file-size = 12G
+shared-file-dir = /shm/
 
 # Target blocks to flush
 flush = 100000
