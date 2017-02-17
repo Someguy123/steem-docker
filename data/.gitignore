@@ -3,6 +3,6 @@ info.log
 witness_node_data_dir/logs
 witness_node_data_dir/node
 witness_node_data_dir/p2p
-witness_node_data_dir/blockchain
+witness_node_data_dir/blockchain/block*
 wallet.json
 lock
