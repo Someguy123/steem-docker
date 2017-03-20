@@ -171,7 +171,7 @@ status() {
 
 }
 
-if [ "$#" -ne 1 ]; then
+if [ "$#" -lt 1 ]; then
     help
 fi
 
