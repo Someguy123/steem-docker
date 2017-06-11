@@ -132,6 +132,7 @@ shm_size() {
 stop() {
     echo $RED"Stopping container..."$RESET
     docker stop $DOCKER_NAME
+    docker rm $DOCKER_NAME
 }
 
 enter() {
