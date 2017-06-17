@@ -143,6 +143,10 @@ wallet() {
     docker exec -it $DOCKER_NAME cli_wallet
 }
 
+remote_wallet() {
+    docker run -v "$DATADIR":/steem --rm -it $DOCKER_NAME cli_wallet -s wss://node.steem.ws
+}
+
 logs() {
     echo $BLUE"DOCKER LOGS: "$RESET
     docker logs --tail=30 $DOCKER_NAME
@@ -216,6 +220,9 @@ case $1 in
         ;;
     wallet)
         wallet
+        ;;
+    remote_wallet)
+        remote_wallet
         ;;
     enter)
         enter
