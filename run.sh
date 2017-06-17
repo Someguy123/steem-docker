@@ -144,7 +144,7 @@ wallet() {
 }
 
 remote_wallet() {
-    docker run -v "$DATADIR":/steem --rm -it steem cli_wallet -s wss://node.steem.ws
+    docker run -v "$DATADIR":/steem --rm -it steem cli_wallet -s wss://steemd.steemit.com
 }
 
 logs() {
