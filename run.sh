@@ -76,6 +76,20 @@ build() {
     docker build -t steem .
 }
 
+dlblocks() {
+    echo "Download @gtg's block logs..."
+    if [[ ! -d "$DATADIR/blockchain" ]]; then
+        mkdir "$DATADIR/blockchain"
+    fi
+    wget https://gtg.steem.house/get/blockchain/block_log -O $DATADIR/blockchain/block_log
+}
+
+install_docker() {
+    sudo apt update
+    sudo apt install curl git
+    curl https://get.docker.com | sh
+}
+
 install() {
     # step 1, get rid of old steem
     echo "Stopping and removing any existing steem containers"
@@ -185,6 +199,9 @@ case $1 in
         echo "You may want to use '$0 install' for a binary image instead, it's faster."
         build
         ;;
+    install_docker)
+        install_docker
+        ;;
     install)
         install
         ;;
@@ -223,6 +240,9 @@ case $1 in
         ;;
     remote_wallet)
         remote_wallet
+        ;;
+    dlblocks)
+        dlblocks 
         ;;
     enter)
         enter
