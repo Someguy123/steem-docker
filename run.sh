@@ -89,9 +89,9 @@ dlblocks() {
         sudo apt update
         sudo apt install -y xz-utils
     fi
-    wget https://gtg.steem.house/get/blockchain.xz/block_log.xz -O $DATADIR/blockchain/block_log.xz
+    wget https://gtg.steem.house/get/blockchain.xz/block_log.xz -O $DATADIR/witness_node_data_dir/blockchain/block_log.xz
     echo "Decompressing block log... this may take a while..."
-    xz -d $DATADIR/blockchain/block_log.xz
+    xz -d $DATADIR/witness_node_data_dir/blockchain/block_log.xz
     echo "FINISHED. Blockchain downloaded and decompressed"
     echo "Remember to resize your /dev/shm, and run with replay!"
     echo "$ ./run.sh shm_size SIZE (e.g. 8G)"
