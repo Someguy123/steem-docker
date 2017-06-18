@@ -77,11 +77,24 @@ build() {
 }
 
 dlblocks() {
-    echo "Download @gtg's block logs..."
     if [[ ! -d "$DATADIR/blockchain" ]]; then
         mkdir "$DATADIR/blockchain"
     fi
-    wget https://gtg.steem.house/get/blockchain/block_log -O $DATADIR/blockchain/block_log
+    echo "Removing old block log"
+    sudo rm -f $DATADIR/blockchain/block_log
+    echo "Download @gtg's block logs..."
+    if [[ $(command -v xz) ]]; then
+        echo "XZ not found. Attempting to install..."
+        sudo apt update
+        sudo apt install -y xz-utils
+    fi
+    wget https://gtg.steem.house/get/blockchain.xz/block_log.xz -O $DATADIR/blockchain/block_log.xz
+    echo "Decompressing block log... this may take a while..."
+    xz -d $DATADIR/blockchain/block_log.xz
+    echo "FINISHED. Blockchain downloaded and decompressed"
+    echo "Remember to resize your /dev/shm, and run with replay!"
+    echo "$ ./run.sh shm_size SIZE (e.g. 8G)"
+    echo "$ ./run.sh replay"
 }
 
 install_docker() {
