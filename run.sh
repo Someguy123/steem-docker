@@ -84,7 +84,7 @@ dlblocks() {
     sudo rm -f $DATADIR/blockchain/block_log
     sudo rm -f $DATADIR/blockchain/block_log.index
     echo "Download @gtg's block logs..."
-    if [[ $(command -v xz) ]]; then
+    if [[ ! $(command -v xz) ]]; then
         echo "XZ not found. Attempting to install..."
         sudo apt update
         sudo apt install -y xz-utils
