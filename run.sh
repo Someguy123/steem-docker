@@ -81,8 +81,8 @@ dlblocks() {
         mkdir "$DATADIR/blockchain"
     fi
     echo "Removing old block log"
-    sudo rm -f $DATADIR/blockchain/block_log
-    sudo rm -f $DATADIR/blockchain/block_log.index
+    sudo rm -f $DATADIR/witness_node_data_dir/blockchain/block_log
+    sudo rm -f $DATADIR/witness_node_data_dir/blockchain/block_log.index
     echo "Download @gtg's block logs..."
     if [[ ! $(command -v xz) ]]; then
         echo "XZ not found. Attempting to install..."
