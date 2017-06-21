@@ -48,16 +48,19 @@ help() {
     echo
     echo "Commands: "
     echo "    start - starts steem container"
+    echo "    dlblocks - download and decompress the blockchain to speed up your first start"
     echo "    replay - starts steem container (in replay mode)"
     echo "    shm_size - resizes /dev/shm to size given, e.g. ./run.sh shm_size 10G "
     echo "    stop - stops steem container"
     echo "    status - show status of steem container"
     echo "    restart - restarts steem container"
+    echo "    install_docker - install docker"
     echo "    install - pulls latest docker image from server (no compiling)"
     echo "    rebuild - builds steem container (from docker file), and then restarts it"
     echo "    build - only builds steem container (from docker file)"
     echo "    logs - show all logs inc. docker logs, and steem logs"
     echo "    wallet - open cli_wallet in the container"
+    echo "    remote_wallet - open cli_wallet in the container connecting to a remote seed"
     echo "    enter - enter a bash session in the container"
     echo
     exit
