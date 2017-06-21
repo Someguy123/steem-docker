@@ -6,6 +6,7 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 DOCKER_DIR="$DIR/dkr"
+FULL_DOCKER_DIR="$DIR/dkr_fullnode"
 DATADIR="$DIR/data"
 DOCKER_NAME="seed"
 
@@ -56,6 +57,7 @@ help() {
     echo "    restart - restarts steem container"
     echo "    install_docker - install docker"
     echo "    install - pulls latest docker image from server (no compiling)"
+    echo "    install_full - pulls latest (FULL NODE FOR RPC) docker image from server (no compiling)"
     echo "    rebuild - builds steem container (from docker file), and then restarts it"
     echo "    build - only builds steem container (from docker file)"
     echo "    logs - show all logs inc. docker logs, and steem logs"
@@ -76,6 +78,12 @@ optimize() {
 build() {
     echo $GREEN"Building docker container"$RESET
     cd $DOCKER_DIR
+    docker build -t steem .
+}
+
+build_full() {
+    echo $GREEN"Building full-node docker container"$RESET
+    cd $FULL_DOCKER_DIR
     docker build -t steem .
 }
 
@@ -113,10 +121,6 @@ install_docker() {
 }
 
 install() {
-    # step 1, get rid of old steem
-    echo "Stopping and removing any existing steem containers"
-    docker stop steem
-    docker rm steem
     echo "Loading image from someguy123/steem"
     docker pull someguy123/steem
     echo "Tagging as steem"
@@ -124,6 +128,13 @@ install() {
     echo "Installation completed. You may now configure or run the server"
 }
 
+install_full() {
+    echo "Loading image from someguy123/steem"
+    docker pull someguy123/steem:latest-full
+    echo "Tagging as steem"
+    docker tag someguy123/steem:latest-full steem
+    echo "Installation completed. You may now configure or run the server"
+}
 seed_exists() {
     seedcount=$(docker ps -a -f name="^/"$DOCKER_NAME"$" | wc -l)
     if [[ $seedcount -eq 2 ]]; then
@@ -221,11 +232,18 @@ case $1 in
         echo "You may want to use '$0 install' for a binary image instead, it's faster."
         build
         ;;
+    build_full)
+        echo "You may want to use '$0 install_full' for a binary image instead, it's faster."
+        build_full
+        ;;
     install_docker)
         install_docker
         ;;
     install)
         install
+        ;;
+    install_full)
+        install_full
         ;;
     start)
         start

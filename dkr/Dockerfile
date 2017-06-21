@@ -22,7 +22,10 @@ RUN cd ~ && \
 	git checkout ${steemd_version} && \
 	git submodule update --init --recursive && \
         cd ~/steem && \
-	cmake -DCMAKE_BUILD_TYPE=Release . && \
+	cmake -DCMAKE_BUILD_TYPE=Release . \
+            -DLOW_MEMORY_NODE=ON \
+            -DCLEAR_VOTES=ON \
+            -DSKIP_BY_TX_ID=ON && \
 	make -j$(nproc) && make install && rm -rf ~/steem
 VOLUME /steem
 WORKDIR /steem
