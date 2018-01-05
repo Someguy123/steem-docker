@@ -14,11 +14,13 @@ To learn more about witnesses and what they do, check out someguy123's article: 
 
 The primary contributor of "STEEM-in-a-box" and author this content is someguy123, a well-known third-party developer for STEEM, and Litecoin. For more information, see https://steemit.com/@someguy123. His witness server is among the top ranking servers: https://steemit.com/~witnesses. 
 
-The other contributors for this repo are:
-* TBD
+The other contributors to this repo are:
+* https://steemit.com/@someguy123
+* https://steemit.com/@oropeso
 
 Please take a minute to show your support by:
-* TBD
+* Following each contributor
+* Voting for each contributor to be a witness
 
 ## New features in this release of "STEEM-in-a-box"
 * `dlblocks` downloads blocks from [@gtg's](https://steemit.com/@gtg) server and decompresses them in the appropriate folder.
@@ -51,7 +53,7 @@ unlocked>> update_witness "your-username" "your-url" "STMyour-super-secure-passw
 ./run.sh stop
 ```
 
-1. Delete the `./dev/shm` files, which are not be compatible with HF19 and need to be re-built.
+1. Delete the `./dev/shm` files, which are not compatible with HF19 and need to be rebuilt.
 ```
 rm -rf /dev/shm/*
 ```
@@ -89,13 +91,13 @@ someguy123:
 
 "I am the CEO of [@privex](https://steemit.com/@privex) - A VPS provider that accepts STEEM, is affordable, and [sells servers with a Zero Block Miss SLA](https://steemit.com/introduceyourself/@privex/we-are-privex-inc-we-accept-steem-protecting-your-privacy-in-the-cloud).
 
-I use @privex for my own witness. As a proof of their quality, I haven't missed a block since moving to them TBD, and I get almost 60 blocks per day. (As of May 2017)
+I use @privex as my own witness. As a proof of their quality, I haven't missed a block since moving to them TBD, and I get almost 60 blocks per day. (As of May 2017)
 
 You'll find plenty of people here on STEEM unaffiliated with us, praising our servers and network."
 
-You're free to use any other server provider. I don't recommend running a witness server on your home internet; it is unlikely to be reliable enough for that purpose.
+You're free to use any other service provider. I don't recommend running a witness server on your home internet; it is unlikely to be reliable enough for that purpose.
 
-Be aware that certain server providers have poor networks or hardware that may cause missed blocks. So, you may need to try a few before you find one that's reliable enough for a witness node. 
+Be aware that certain service providers have poor networks or hardware that may cause missed blocks. So, you may need to try a few before you find one that's reliable enough for a witness node. 
 
 To learn more about witnesses and what they do, check out my article: https://steemit.com/witness-category/@someguy123/seriously-what-is-a-witness-why-should-i-care-how-do-i-become-one-answer
 "
@@ -128,9 +130,9 @@ cd steem-docker
 ```
 
 1. If you are not logged in as root:
-	a. Wait for the previous command to finish installing Docker. 
-	b. Log out and back in again. 
-	c. Enter `cd steem-docker`.
+    a. Wait for the previous command to finish installing Docker. 
+    b. Log out and back in again. 
+    c. Enter `cd steem-docker`.
 
 1. Download the pre-compiled STEEM image from DockerHub:
 ```
@@ -176,7 +178,7 @@ This command returns the something similar to this:
 sudo ./run.sh shm_size 12G
 ```
 
-1. Open the config file in your favourite text editor. This example shows how to do it using Nano, an editor that is good for beginners.
+1. Open the config file in your favorite text editor. This example shows how to do it using Nano, an editor that is good for beginners.
 ```
 nano data/witness_node_data_dir/config.ini
 ```
@@ -210,13 +212,13 @@ shared-file-size = 12G
 1. Save and close the configuration file. (With nano, press **CTRL-X** and choose **yes**.)
 
 1. Adjust the steem-in-a-box settings so it is named correctly, and disable port forwarding for seeds. 
-	
-	a. First create a `.env` file to hold the settings.
+    
+    a. First, create a `.env` file to hold the settings.
 ```
 nano .env
 ```
 
-	b. The file will be blank. In the file put the following:
+    b. The file will be blank. In the file put the following:
 ```
 PORTS=
 DOCKER_NAME=witness
@@ -247,7 +249,7 @@ You should see something similar to this:
    0.77369%   100000 of 12925066   (12282M free)
 ```
 
-If you see lots of red error messages, something went wrong. You can ask for help debugging it in the witness channel on [STEEMIT.CHAT](https://steemit.chat/channel/witness).
+If you see lots of red error messages, something went wrong. You can ask for help debugging it on the witness channel on [STEEMIT.CHAT](https://steemit.chat/channel/witness).
 
 If it appears to be working, leave it for an hour or so. Check the logs every 10 minutes until you see something like this:
 ```
