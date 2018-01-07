@@ -91,13 +91,13 @@ someguy123:
 
 "I am the CEO of [@privex](https://steemit.com/@privex) - A VPS provider that accepts STEEM, is affordable, and [sells servers with a Zero Block Miss SLA](https://steemit.com/introduceyourself/@privex/we-are-privex-inc-we-accept-steem-protecting-your-privacy-in-the-cloud).
 
-I use @privex as my own witness. As a proof of their quality, I haven't missed a block since moving to them TBD, and I get almost 60 blocks per day. (As of May 2017)
+I use @privex for my own witness. As a proof of their quality, I haven't missed a block since moving to them TBD, and I get almost 60 blocks per day. (As of May 2017)
 
 You'll find plenty of people here on STEEM unaffiliated with us, praising our servers and network."
 
-You're free to use any other service provider. I don't recommend running a witness server on your home internet; it is unlikely to be reliable enough for that purpose.
+You're free to use any other server provider. I don't recommend running a witness server on your home internet; it is unlikely to be reliable enough for that purpose.
 
-Be aware that certain service providers have poor networks or hardware that may cause missed blocks. So, you may need to try a few before you find one that's reliable enough for a witness node. 
+Be aware that certain server providers have poor networks or hardware that may cause missed blocks. So, you may need to try a few before you find one that's reliable enough for a witness node. 
 
 To learn more about witnesses and what they do, check out my article: https://steemit.com/witness-category/@someguy123/seriously-what-is-a-witness-why-should-i-care-how-do-i-become-one-answer
 "
@@ -178,7 +178,7 @@ This command returns the something similar to this:
 sudo ./run.sh shm_size 12G
 ```
 
-1. Open the config file in your favorite text editor. This example shows how to do it using Nano, an editor that is good for beginners.
+1. Open the config file in your favourite text editor. This example shows how to do it using Nano, an editor that is good for beginners.
 ```
 nano data/witness_node_data_dir/config.ini
 ```
@@ -249,7 +249,7 @@ You should see something similar to this:
    0.77369%   100000 of 12925066   (12282M free)
 ```
 
-If you see lots of red error messages, something went wrong. You can ask for help debugging it on the witness channel on [STEEMIT.CHAT](https://steemit.chat/channel/witness).
+If you see lots of red error messages, something went wrong. You can ask for help debugging it in the witness channel on [STEEMIT.CHAT](https://steemit.chat/channel/witness).
 
 If it appears to be working, leave it for an hour or so. Check the logs every 10 minutes until you see something like this:
 ```
