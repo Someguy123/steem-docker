@@ -6,7 +6,7 @@ FROM ubuntu:xenial
 RUN apt-get update && \
 	apt-get install -y gcc-4.9 g++-4.9 cmake make libbz2-dev libdb++-dev libdb-dev && \
 	apt-get install -y libssl-dev openssl libreadline-dev autoconf libtool git && \
-	apt-get install -y autotools-dev build-essential g++ libbz2-dev libicu-dev python-dev wget doxygen python3 python3-dev libboost-all-dev curl && \
+	apt-get install -y autotools-dev build-essential g++ libbz2-dev libicu-dev python-dev wget doxygen python3 python3-dev libboost-all-dev curl python3-pip && \
         apt-get clean -qy && \
         pip3 install jinja2
 
