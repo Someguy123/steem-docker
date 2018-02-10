@@ -34,7 +34,7 @@ seed-node = steem-seed.lukestokes.info:2001     # lukestokes
 seed-node = seed.blackrift.net:2001             # drakos
 seed-node = seed.jerrybanfield.com:2001         # @jerrybanfield (USA)
 seed-node = node.mahdiyari.info:2001            # @mahdiyari (NL)
-
+seed-node = steemseed-fin.privex.io:2001        # @privex (FI)
 
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
