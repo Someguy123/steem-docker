@@ -187,11 +187,11 @@ enter() {
 }
 
 wallet() {
-    docker exec -it $DOCKER_NAME cli_wallet --data-dir=/steem -s ws://127.0.0.1:8090
+    docker exec -it $DOCKER_NAME cli_wallet -s ws://127.0.0.1:8090
 }
 
 remote_wallet() {
-    docker run -v "$DATADIR":/steem --rm -it steem cli_wallet --data-dir=/steem -s wss://steemd.privex.io
+    docker run -v "$DATADIR":/steem --rm -it steem cli_wallet -s wss://steemd.privex.io
 }
 
 logs() {
