@@ -22,29 +22,28 @@ shared-file-scale-rate = 1000
 flush = 100000
 
 # P2P nodes to connect to on startup (may specify multiple times)
-seed-node = anyx.co:2001                        # @anyx (CA)
-seed-node = gtg.steem.house:2001                # @gtg (PL)
-seed-node = seed.steemnodes.com:2001            # @wackou (NL)
-seed-node = 192.99.3.29:2001                    # joseph
-seed-node = 5.9.18.213:2001                     # pfunk
-seed-node = lafonasteem.com:2001                # lafona
-seed-node = seed.rossco99.com:2001              # rossco99
-seed-node = steem-seed.altcap.io:40696          # ihashfury
-seed-node = seed.steemfeeder.com:2001           # au1nethyb1
-seed-node = seed.roelandp.nl:2001               # roelandp
-seed-node = steem.global:2001                   # klye
-seed-node = seed.esteem.ws:2001                 # good-karma
-seed-node = 176.31.126.187:2001                 # timcliff
-seed-node = seed.thecryptodrive.com:2001        # thecryptodrive
-seed-node = steem-id.altexplorer.xyz:2001       # steem-id
-seed-node = seed.bitcoiner.me:2001              # bitcoiner
-seed-node = 104.199.118.92:2001                 # clayop
-seed-node = seed.steemviz.com:2001              # ausbitbank
-seed-node = steem-seed.lukestokes.info:2001     # lukestokes
-seed-node = seed.blackrift.net:2001             # drakos
-seed-node = seed.jerrybanfield.com:2001         # @jerrybanfield (USA)
-seed-node = node.mahdiyari.info:2001            # @mahdiyari (NL)
-seed-node = steemseed-fin.privex.io:2001        # @privex (FI)
+p2p-seed-node = anyx.co:2001                        # @anyx (CA)
+p2p-seed-node = gtg.steem.house:2001                # @gtg (PL)
+p2p-seed-node = seed.steemnodes.com:2001            # @wackou (NL)
+p2p-seed-node = 192.99.3.29:2001                    # joseph
+p2p-seed-node = 5.9.18.213:2001                     # pfunk
+p2p-seed-node = lafonasteem.com:2001                # lafona
+p2p-seed-node = seed.rossco99.com:2001              # rossco99
+p2p-seed-node = steem-seed.altcap.io:40696          # ihashfury
+p2p-seed-node = seed.steemfeeder.com:2001           # au1nethyb1
+p2p-seed-node = seed.roelandp.nl:2001               # roelandp
+p2p-seed-node = steem.global:2001                   # klye
+p2p-seed-node = seed.esteem.ws:2001                 # good-karma
+p2p-seed-node = 176.31.126.187:2001                 # timcliff
+p2p-seed-node = seed.thecryptodrive.com:2001        # thecryptodrive
+p2p-seed-node = steem-id.altexplorer.xyz:2001       # steem-id
+p2p-seed-node = seed.bitcoiner.me:2001              # bitcoiner
+p2p-seed-node = 104.199.118.92:2001                 # clayop
+p2p-seed-node = seed.steemviz.com:2001              # ausbitbank
+p2p-seed-node = steem-seed.lukestokes.info:2001     # lukestokes
+p2p-seed-node = seed.blackrift.net:2001             # drakos
+p2p-seed-node = node.mahdiyari.info:2001            # @mahdiyari (NL)
+p2p-seed-node = steemseed-fin.privex.io:2001        # @privex (FI)
 
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
