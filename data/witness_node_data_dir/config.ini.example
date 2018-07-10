@@ -5,8 +5,18 @@ p2p-endpoint = 0.0.0.0:2001
 # p2p-max-connections =
 
 # Shared file size
-shared-file-size = 15G
+shared-file-size = 64G
 shared-file-dir = /shm/
+
+# A 2-precision percentage (0-10000) that defines the threshold for when to 
+# autoscale the shared memory file. Setting this to 0 disables autoscaling. 
+# The recommended value for consensus node is 9500 (95%). Full node is 9900 (99%).
+shared-file-full-threshold = 9500
+
+# A 2-precision percentage (0-10000) that defines how quickly to scale the shared memory file. 
+# When autoscaling occurs, the file's size will be increased by this percentage. 
+# Setting this to 0 disables autoscaling. The recommended value is between 1000 and 2000 (10-20%).
+shared-file-scale-rate = 1000
 
 # Target blocks to flush
 flush = 100000
@@ -106,22 +116,12 @@ required-participation = false
 # SBD interest rate to be vote on upon successful POW - Default interest rate is 10% (written as 1000)
 # miner-sbd-interest-rate =
 
-# declare an appender named "stderr" that writes messages to the console
-[log.console_appender.stderr]
-stream=std_error
+# Console appender definition json: {"appender", "stream"}
+log-console-appender = {"appender":"stderr","stream":"std_error"}
 
-# declare an appender named "p2p" that writes messages to p2p.log
-[log.file_appender.p2p]
-filename=logs/p2p/p2p.log
-# filename can be absolute or relative to this config file
+# File appender definition json:  {"appender", "file"}
+log-file-appender = {"appender":"p2p","file":"logs/p2p/p2p.log"}
 
-# route any messages logged to the default logger to the "stderr" logger we
-# declared above, if they are info level are higher
-[logger.default]
-level=warn
-appenders=stderr
-
-# route messages sent to the "p2p" logger to the p2p appender declared above
-[logger.p2p]
-level=warn
-appenders=p2p
+# Logger definition json: {"name", "level", "appender"}
+log-logger = {"name":"default","level":"debug","appender":"stderr"}
+log-logger = {"name":"p2p","level":"debug","appender":"p2p"}

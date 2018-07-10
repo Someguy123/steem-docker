@@ -122,9 +122,9 @@ install_docker() {
 
 install() {
     echo "Loading image from someguy123/steem"
-    docker pull someguy123/steem
+    docker pull someguy123/steem:v0.19.10
     echo "Tagging as steem"
-    docker tag someguy123/steem steem
+    docker tag someguy123/steem:v0.19.10 steem
     echo "Installation completed. You may now configure or run the server"
 }
 
@@ -159,7 +159,7 @@ start() {
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
     else
-        docker run $DPORTS -v /dev/shm:/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem
+        docker run $DPORTS -v /dev/shm:/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir
     fi
 }
 
@@ -167,7 +167,7 @@ replay() {
     echo "Removing old container"
     docker rm $DOCKER_NAME
     echo "Running steem with replay..."
-    docker run $DPORTS -v /dev/shm:/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --replay
+    docker run $DPORTS -v /dev/shm:/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir --replay
     echo "Started."
 }
 
@@ -187,16 +187,16 @@ enter() {
 }
 
 wallet() {
-    docker exec -it $DOCKER_NAME cli_wallet
+    docker exec -it $DOCKER_NAME cli_wallet --data-dir=/steem -s ws://127.0.0.1:8090
 }
 
 remote_wallet() {
-    docker run -v "$DATADIR":/steem --rm -it steem cli_wallet -s wss://steemd.privex.io
+    docker run -v "$DATADIR":/steem --rm -it steem cli_wallet --data-dir=/steem -s wss://steemd.privex.io
 }
 
 logs() {
-    echo $BLUE"DOCKER LOGS: "$RESET
-    docker logs --tail=30 $DOCKER_NAME
+    echo $BLUE"DOCKER LOGS: (press ctrl-c to exit) "$RESET
+    docker logs -f --tail=30 $DOCKER_NAME
     #echo $RED"INFO AND DEBUG LOGS: "$RESET
     #tail -n 30 $DATADIR/{info.log,debug.log}
 }
