@@ -5,7 +5,7 @@ p2p-endpoint = 0.0.0.0:2001
 # p2p-max-connections =
 
 # Shared file size
-shared-file-size = 64G
+shared-file-size = 60G
 shared-file-dir = /shm/
 
 # A 2-precision percentage (0-10000) that defines the threshold for when to 
