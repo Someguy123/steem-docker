@@ -16,7 +16,7 @@ EXPOSE 2001
 EXPOSE 5000
 EXPOSE 8090
 
-ARG steemd_version=v0.19.10
+ARG steemd_version=v0.19.11
 
 RUN cd ~ && \
 	git clone https://github.com/steemit/steem.git && \

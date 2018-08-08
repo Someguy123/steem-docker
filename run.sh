@@ -19,6 +19,7 @@ MAGENTA="$(tput setaf 5)"
 CYAN="$(tput setaf 6)"
 WHITE="$(tput setaf 7)"
 RESET="$(tput sgr0)"
+DK_TAG=someguy123/steem:appbase
 
 # default. override in .env
 PORTS="2001"
@@ -122,9 +123,9 @@ install_docker() {
 
 install() {
     echo "Loading image from someguy123/steem"
-    docker pull someguy123/steem:v0.19.10
+    docker pull $DK_TAG 
     echo "Tagging as steem"
-    docker tag someguy123/steem:v0.19.10 steem
+    docker tag $DK_TAG steem
     echo "Installation completed. You may now configure or run the server"
 }
 
