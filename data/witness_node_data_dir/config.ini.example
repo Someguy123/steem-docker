@@ -116,11 +116,12 @@ required-participation = 33
 # miner-sbd-interest-rate =
 
 # Console appender definition json: {"appender", "stream"}
-log-console-appender = {"appender":"stderr","stream":"std_error"}
+log-appender = {"appender":"stderr","stream":"std_error"}
 
 # File appender definition json:  {"appender", "file"}
-log-file-appender = {"appender":"p2p","file":"logs/p2p/p2p.log"}
+log-appender = {"appender":"p2p","file":"logs/p2p/p2p.log"}
 
 # Logger definition json: {"name", "level", "appender"}
 log-logger = {"name":"default","level":"debug","appender":"stderr"}
-log-logger = {"name":"p2p","level":"debug","appender":"p2p"}
+log-logger = {"name":"p2p","level":"warn","appender":"p2p"}
+
