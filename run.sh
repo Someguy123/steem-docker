@@ -21,6 +21,7 @@ WHITE="$(tput setaf 7)"
 RESET="$(tput sgr0)"
 DK_TAG=someguy123/steem:latest
 DK_TAG_FULL=someguy123/steem:latest-full
+SHM_DIR=/dev/shm
 
 # default. override in .env
 PORTS="2001"
@@ -161,7 +162,7 @@ start() {
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
     else
-        docker run $DPORTS -v /dev/shm:/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir
+        docker run $DPORTS -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir
     fi
 }
 
@@ -169,7 +170,7 @@ replay() {
     echo "Removing old container"
     docker rm $DOCKER_NAME
     echo "Running steem with replay..."
-    docker run $DPORTS -v /dev/shm:/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir --replay
+    docker run $DPORTS -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir --replay
     echo "Started."
 }
 

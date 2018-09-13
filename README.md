@@ -144,6 +144,7 @@ Full list of possible configuration options:
  - **FULL_DOCKER_DIR** - default `$DIR/dkr_fullnode` - The directory to build the full-node RPC node docker image from
  - **DK_TAG** - default `someguy123/steem:latest` - The docker tag to obtain Steem from. Useful for installing beta versions, or downgrading to previous versions.
  - **DK_TAG_FULL** - default `someguy123/steem:latest-full` - The docker tag to obtain Steem (full RPC node)  from. Useful for installing beta versions, or downgrading to previous versions.
+ - **SHM_DIR** - default `/dev/shm` - override the location of shared_memory.bin and shared_memory.meta. /dev/shm is a RAM disk on Linux, and can be adjusted with `shm_size`
 
 # Commands
 
@@ -157,6 +158,7 @@ Full list of `./run.sh` commands:
    - be aware, due to the way load balancing works, this may raise an error at first. just run it again a few times and eventually it will connect. note that external servers often have a 60 second connection limit, so you may be disconnected within 60 seconds.
  - **replay** - replay a steem-docker instance (run `stop` first) 
  - **dlblocks** - download blocks from gtg (gandalf)'s block log server and install them into the blockchain directory
+ - **shm_size (size)** - change the size of /dev/shm, e.g. `./run.sh shm_size 64G` for 64 gigabytes
  - **install** - install or update the steem docker image from docker hub
  - **install_full** - install or update the full node steem docker image from docker hub
  - **build** - build the low memory mode version of steem into a docker image from source
