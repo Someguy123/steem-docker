@@ -1,0 +1,4 @@
+data/witness_node_data_dir/config.ini
+.vscode
+.idea
+.DS_Store
