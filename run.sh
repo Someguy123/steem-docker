@@ -22,6 +22,7 @@ RESET="$(tput sgr0)"
 DK_TAG=someguy123/steem:latest
 DK_TAG_FULL=someguy123/steem:latest-full
 SHM_DIR=/dev/shm
+REMOTE_WS=wss://steemd.privex.io
 
 # default. override in .env
 PORTS="2001"
@@ -194,7 +195,7 @@ wallet() {
 }
 
 remote_wallet() {
-    docker run -v "$DATADIR":/steem --rm -it steem cli_wallet -s wss://steemd.privex.io
+    docker run -v "$DATADIR":/steem --rm -it steem cli_wallet -s "$REMOTE_WS"
 }
 
 logs() {

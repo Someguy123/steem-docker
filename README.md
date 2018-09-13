@@ -145,6 +145,7 @@ Full list of possible configuration options:
  - **DK_TAG** - default `someguy123/steem:latest` - The docker tag to obtain Steem from. Useful for installing beta versions, or downgrading to previous versions.
  - **DK_TAG_FULL** - default `someguy123/steem:latest-full` - The docker tag to obtain Steem (full RPC node)  from. Useful for installing beta versions, or downgrading to previous versions.
  - **SHM_DIR** - default `/dev/shm` - override the location of shared_memory.bin and shared_memory.meta. /dev/shm is a RAM disk on Linux, and can be adjusted with `shm_size`
+ - **REMOTE_WS** - default `wss://steemd.privex.io` - the websocket server to use for the `remote_wallet` command
 
 # Commands
 
@@ -154,7 +155,7 @@ Full list of `./run.sh` commands:
  - **stop** - shutdown a steem-docker instance
  - **restart** - restart a steem-docker instance (will also start it if it's already stopped)
  - **wallet** - connect to the local container wallet
- - **remote_wallet** - connect to a remote wallet (hardcoded to wss://steemd.privex.io - @privex load balancer)
+ - **remote_wallet** - connect to a remote wallet (default is wss://steemd.privex.io - @privex load balancer)
    - be aware, due to the way load balancing works, this may raise an error at first. just run it again a few times and eventually it will connect. note that external servers often have a 60 second connection limit, so you may be disconnected within 60 seconds.
  - **replay** - replay a steem-docker instance (run `stop` first) 
  - **dlblocks** - download blocks from gtg (gandalf)'s block log server and install them into the blockchain directory
