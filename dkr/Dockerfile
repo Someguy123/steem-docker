@@ -1,8 +1,12 @@
 
+FROM ubuntu:xenial
+
 # cd ~/dkr && docker build -t steem .
 # docker run -p 0.0.0.0:2001:2001 -v $PWD/data:/steem -d -t steem
 
-FROM ubuntu:xenial
+ARG STEEM_STATIC_BUILD=ON
+ENV STEEM_STATIC_BUILD ${STEEM_STATIC_BUILD}
+
 RUN apt-get update && \
 	apt-get install -y gcc-4.9 g++-4.9 cmake make libbz2-dev libdb++-dev libdb-dev && \
 	apt-get install -y libssl-dev openssl libreadline-dev autoconf libtool git gdb liblz4-tool wget jq virtualenv libgflags-dev libsnappy-dev zlib1g-dev libbz2-dev liblz4-dev libzstd-dev && \
@@ -27,6 +31,7 @@ RUN cd ~ && \
 	cmake -DCMAKE_BUILD_TYPE=Release . \
             -DLOW_MEMORY_NODE=ON \
             -DCLEAR_VOTES=ON \
+            -DSTEEM_STATIC_BUILD=${STEEM_STATIC_BUILD} \
             -DSKIP_BY_TX_ID=ON && \
 	make -j$(nproc) && make install && rm -rf ~/steem
 VOLUME /steem
