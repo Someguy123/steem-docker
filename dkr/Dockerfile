@@ -20,7 +20,7 @@ EXPOSE 2001
 EXPOSE 5000
 EXPOSE 8090
 
-ARG steemd_version=v0.20.0
+ARG steemd_version=v0.19.12
 
 RUN cd ~ && \
 	git clone https://github.com/steemit/steem.git && \
@@ -28,6 +28,10 @@ RUN cd ~ && \
 	git checkout ${steemd_version} && \
 	git submodule update --init --recursive && \
         cd ~/steem && \
+        curl https://github.com/abitmore/steem/commit/91d9ca782ef0de87015f2d3d14bea4571aa98811.patch | git apply && \
+        curl https://github.com/abitmore/steem/commit/250e9b96be7080c35220e948e84a9b4b2d255b71.patch | git apply && \
+        curl https://github.com/abitmore/steem/commit/2e7dca8e9639df6a62429f58a24803978bbc5b7b.patch | git apply && \
+        curl https://github.com/abitmore/steem/commit/9ef9052e00ddf61dbff6d2a3f1e1a839d3db190e.patch | git apply && \
 	cmake -DCMAKE_BUILD_TYPE=Release . \
             -DLOW_MEMORY_NODE=ON \
             -DCLEAR_VOTES=ON \
