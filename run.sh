@@ -19,10 +19,11 @@ MAGENTA="$(tput setaf 5)"
 CYAN="$(tput setaf 6)"
 WHITE="$(tput setaf 7)"
 RESET="$(tput sgr0)"
-DK_TAG=someguy123/steem:latest
+: ${DK_TAG="someguy123/steem:latest"}
 DK_TAG_FULL=someguy123/steem:latest-full
+: ${DK_TAG_FULL="someguy123/steem:latest-full"}
 SHM_DIR=/dev/shm
-REMOTE_WS=wss://steemd.privex.io
+: ${REMOTE_WS="wss://steemd.privex.io"}
 
 # default. override in .env
 PORTS="2001"
