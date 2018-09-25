@@ -1,4 +1,7 @@
-data/witness_node_data_dir/config.ini
+data/witness_node_data_dir/config.ini*
 .vscode
 .idea
 .DS_Store
+.env
+data/advanced_benchmark.json
+data/r_advanced_benchmark.json
