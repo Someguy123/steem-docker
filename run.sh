@@ -38,14 +38,10 @@ if [[ ! -f data/witness_node_data_dir/config.ini ]]; then
 fi
 
 IFS=","
-DPORTS=""
+DPORTS=()
 for i in $PORTS; do
     if [[ $i != "" ]]; then
-         if [[ $DPORTS == "" ]]; then
-            DPORTS="-p0.0.0.0:$i:$i"
-        else
-            DPORTS="$DPORTS -p0.0.0.0:$i:$i"
-        fi
+	    DPORTS+=("-p0.0.0.0:$i:$i")
     fi
 done
 
@@ -164,7 +160,7 @@ start() {
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
     else
-        docker run $DPORTS -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir
+        docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir
     fi
 }
 
@@ -172,7 +168,7 @@ replay() {
     echo "Removing old container"
     docker rm $DOCKER_NAME
     echo "Running steem with replay..."
-    docker run $DPORTS -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir --replay
+    docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir --replay
     echo "Started."
 }
 
