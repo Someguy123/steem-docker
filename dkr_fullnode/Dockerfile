@@ -13,10 +13,12 @@ RUN apt-get update && \
 # P2P (seed) port
 EXPOSE 2001
 # RPC ports
-EXPOSE 5000
+EXPOSE 8091
 EXPOSE 8090
 
-ARG steemd_version=v0.20.0
+ARG steemd_version=stable
+ARG STEEM_STATIC_BUILD=ON
+ENV STEEM_STATIC_BUILD ${STEEM_STATIC_BUILD}
 
 RUN cd ~ && \
 	git clone https://github.com/steemit/steem.git && \
@@ -27,6 +29,7 @@ RUN cd ~ && \
 	cmake -DCMAKE_BUILD_TYPE=Release . \
             -DCLEAR_VOTES=OFF \
             -DLOW_MEMORY_NODE=OFF \
+            -DSTEEM_STATIC_BUILD=${STEEM_STATIC_BUILD} \
             -DSKIP_BY_TX_ID=OFF && \
 	make -j$(nproc) && make install && rm -rf ~/steem
 VOLUME /steem
