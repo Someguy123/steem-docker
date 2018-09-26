@@ -260,24 +260,30 @@ tslogs() {
         sudo apt update
         sudo apt install -y jq
     fi
-	local LOG_PATH=$(docker inspect $DOCKER_NAME | jq -r .[0].LogPath)
-	local pipe=/tmp/dkpipe.fifo
-	trap "rm -f $pipe" EXIT
-	if [[ ! -p $pipe ]]; then
-		mkfifo $pipe
-	fi
+    local LOG_PATH=$(docker inspect $DOCKER_NAME | jq -r .[0].LogPath)
+    local pipe=/tmp/dkpipe.fifo
+    trap "rm -f $pipe" EXIT
+    if [[ ! -p $pipe ]]; then
+        mkfifo $pipe
+    fi
 
-	tail -f "$LOG_PATH" &> /tmp/dkpipe.fifo &
-	while true
-	do
-		if read -r line <$pipe; then
+    tail -f "$LOG_PATH" &> /tmp/dkpipe.fifo &
+    while true
+    do
+        if read -r line <$pipe; then
             # first, parse the line and print the time + log
+            L=$(jq -r ".time +\" \" + .log" <<<"$line")
             # then, remove excessive \r's causing multiple line breaks
+            L=$(sed -e "s/\r//" <<< "$L")
             # now remove the decimal time to make the logs cleaner
+            L=$(sed -e 's/\..*Z//' <<< "$L")
+            # remove the steem ms time because most people don't care
+            L=$(sed -e 's/[0-9]\+ms //' <<< "$L")
             # and finally, strip off any duplicate new line characters
-			jq -r ".time +\" \" + .log" <<<"$line" | sed -e "s/\r//" | sed -e 's/\..*Z//' | tr -s "\n"
-		fi
-	done
+            L=$(tr -s "\n" <<< "$L")
+            printf '%s\r\n' "$L"
+        fi
+    done
 }
 
 status() {
