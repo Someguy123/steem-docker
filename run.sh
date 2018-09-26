@@ -271,7 +271,11 @@ tslogs() {
 	while true
 	do
 		if read -r line <$pipe; then
-			jq -r ".time +\" \" + .log" <<<"$line" | sed -e "s/\r//" | tr -s "\n"
+            # first, parse the line and print the time + log
+            # then, remove excessive \r's causing multiple line breaks
+            # now remove the decimal time to make the logs cleaner
+            # and finally, strip off any duplicate new line characters
+			jq -r ".time +\" \" + .log" <<<"$line" | sed -e "s/\r//" | sed -e 's/\..*Z//' | tr -s "\n"
 		fi
 	done
 }
