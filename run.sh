@@ -249,6 +249,32 @@ logs() {
     #tail -n 30 $DATADIR/{info.log,debug.log}
 }
 
+pclogs() {
+	docker logs -t --tail=20000 $DOCKER_NAME | grep "M free"
+}
+
+tslogs() {
+    if [[ ! $(command -v xz) ]]; then
+        echo "jq not found. Attempting to install..."
+        sudo apt update
+        sudo apt install -y jq
+    fi
+	local LOG_PATH=$(docker inspect $DOCKER_NAME | jq -r .[0].LogPath)
+	local pipe=/tmp/dkpipe.fifo
+	trap "rm -f $pipe" EXIT
+	if [[ ! -p $pipe ]]; then
+		mkfifo $pipe
+	fi
+
+	tail -f "$LOG_PATH" &> /tmp/dkpipe.fifo &
+	while true
+	do
+		if read line <$pipe; then
+			printf "$line" | jq -r ".time +\" \" + .log" | sed -e "s/\r//" | tr -s "\n"
+		fi
+	done
+}
+
 status() {
     
     seed_exists
@@ -337,6 +363,12 @@ case $1 in
         ;;
     logs)
         logs
+        ;;
+    pclogs)
+        pclogs
+        ;;
+    tslogs)
+        tslogs
         ;;
     *)
         echo "Invalid cmd"
