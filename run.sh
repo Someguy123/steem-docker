@@ -77,12 +77,34 @@ optimize() {
 }
 
 build() {
+    if (( $# == 1 )); then
+	BUILD_VER=$1
+	echo $BLUE"CUSTOM BUILD SPECIFIED. Building from branch/tag $BUILD_VER"$RESET
+	sleep 2
+	cd $DOCKER_DIR
+	CUST_TAG="steem:$BUILD_VER"
+        docker build --build-arg "steemd_version=$BUILD_VER" -t "$CUST_TAG" .
+	echo $RED"For your safety, we've tagged this image as $CUST_TAG"$RESET
+	echo $RED"To use it in this steem-docker, run: docker tag $CUST_TAG steem:latest"$RESET
+	return
+    fi
     echo $GREEN"Building docker container"$RESET
     cd $DOCKER_DIR
     docker build -t steem .
 }
 
 build_full() {
+    if (( $# == 1 )); then
+	BUILD_VER=$1
+	echo $BLUE"CUSTOM (FULL NODE) BUILD SPECIFIED. Building from branch/tag $BUILD_VER"$RESET
+	sleep 2
+	cd $FULL_DOCKER_DIR
+	CUST_TAG="steem:$BUILD_VER"
+        docker build --build-arg "steemd_version=$BUILD_VER" -t "$CUST_TAG" .
+	echo $RED"For your safety, we've tagged this image as $CUST_TAG"$RESET
+	echo $RED"To use it in this steem-docker, run: docker tag $CUST_TAG steem:latest"$RESET
+	return
+    fi
     echo $GREEN"Building full-node docker container"$RESET
     cd $FULL_DOCKER_DIR
     docker build -t steem .
@@ -122,7 +144,11 @@ install_docker() {
 }
 
 install() {
-    echo "Loading image from someguy123/steem"
+    if (( $# == 1 )); then
+	DK_TAG=$1
+    fi
+    echo $BLUE"NOTE: You are installing image $DK_TAG. Please make sure this is correct."$RESET
+    sleep 2
     docker pull $DK_TAG 
     echo "Tagging as steem"
     docker tag $DK_TAG steem
@@ -173,6 +199,9 @@ replay() {
 }
 
 shm_size() {
+    if (( $# != 1 )); then
+	echo $RED"Please specify a size, such as ./run.sh shm_size 64G"
+    fi
     echo "Setting SHM to $1"
     mount -o remount,size=$1 /dev/shm
 }
@@ -231,17 +260,17 @@ fi
 case $1 in
     build)
         echo "You may want to use '$0 install' for a binary image instead, it's faster."
-        build
+        build "$@"
         ;;
     build_full)
         echo "You may want to use '$0 install_full' for a binary image instead, it's faster."
-        build_full
+        build_full "$@"
         ;;
     install_docker)
         install_docker
         ;;
     install)
-        install
+        install "$@"
         ;;
     install_full)
         install_full
