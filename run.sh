@@ -255,7 +255,8 @@ pclogs() {
 
 tslogs() {
     if [[ ! $(command -v jq) ]]; then
-        echo "jq not found. Attempting to install..."
+        echo $RED"jq not found. Attempting to install..."$RESET
+        sleep 3
         sudo apt update
         sudo apt install -y jq
     fi
@@ -270,7 +271,7 @@ tslogs() {
 	while true
 	do
 		if read line <$pipe; then
-			printf "$line" | jq -r ".time +\" \" + .log" | sed -e "s/\r//" | tr -s "\n"
+			jq -r ".time +\" \" + .log" <<<"$line" | sed -e "s/\r//" | tr -s "\n"
 		fi
 	done
 }
