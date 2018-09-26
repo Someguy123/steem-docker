@@ -221,6 +221,9 @@ wallet() {
 }
 
 remote_wallet() {
+    if (( $# == 1 )); then
+	REMOTE_WS=$1
+    fi
     docker run -v "$DATADIR":/steem --rm -it steem cli_wallet -s "$REMOTE_WS"
 }
 
@@ -260,17 +263,17 @@ fi
 case $1 in
     build)
         echo "You may want to use '$0 install' for a binary image instead, it's faster."
-        build "$@"
+        build "${@:2}"
         ;;
     build_full)
         echo "You may want to use '$0 install_full' for a binary image instead, it's faster."
-        build_full "$@"
+        build_full "${@:2}"
         ;;
     install_docker)
         install_docker
         ;;
     install)
-        install "$@"
+        install "${@:2}"
         ;;
     install_full)
         install_full
@@ -309,7 +312,7 @@ case $1 in
         wallet
         ;;
     remote_wallet)
-        remote_wallet
+        remote_wallet "${@:2}"
         ;;
     dlblocks)
         dlblocks 
