@@ -266,7 +266,9 @@ tslogs() {
     if [[ ! -p $pipe ]]; then
         mkfifo $pipe
     fi
-    # run in a sub shell
+    # run each in a sub shell
+    # the sleep is a dirty hack to keep the pipe open
+    (sleep 10000 > /tmp/dkpipe.fifo &)
     (tail -f "$LOG_PATH" &> /tmp/dkpipe.fifo &)
     while true
     do
