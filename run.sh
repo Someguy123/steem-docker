@@ -266,8 +266,8 @@ tslogs() {
     if [[ ! -p $pipe ]]; then
         mkfifo $pipe
     fi
-
-    tail -f "$LOG_PATH" &> /tmp/dkpipe.fifo &
+    # run in a sub shell
+    (tail -f "$LOG_PATH" &> /tmp/dkpipe.fifo &)
     while true
     do
         if read -r line <$pipe; then
