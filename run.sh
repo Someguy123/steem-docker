@@ -250,7 +250,42 @@ logs() {
 }
 
 pclogs() {
-	docker logs -f -t --tail=20000 $DOCKER_NAME | grep "M free" | sed -e 's/\..*Z//' | sed -e 's/[0-9]\+ms //'
+    if [[ ! $(command -v jq) ]]; then
+        echo $RED"jq not found. Attempting to install..."$RESET
+        sleep 3
+        sudo apt update
+        sudo apt install -y jq
+    fi
+    local LOG_PATH=$(docker inspect $DOCKER_NAME | jq -r .[0].LogPath)
+    local pipe=/tmp/dkpipepc.fifo
+    trap "rm -f $pipe" EXIT
+    if [[ ! -p $pipe ]]; then
+        mkfifo $pipe
+    fi
+    # the sleep is a dirty hack to keep the pipe open
+
+    sleep 10000 < $pipe &
+    tail -n 5000 -f "$LOG_PATH" &> $pipe &
+    while true
+    do
+        if read -r line <$pipe; then
+            # first grep the data for "M free" to avoid
+            # needlessly processing the data
+            L=$(grep --colour=never "M free" <<< "$line")
+            if [[ $? -ne 0 ]]; then
+                continue
+            fi
+            # then, parse the line and print the time + log
+            L=$(jq -r ".time +\" \" + .log" <<< "$L")
+            # then, remove excessive \r's causing multiple line breaks
+            L=$(sed -e "s/\r//" <<< "$L")
+            # now remove the decimal time to make the logs cleaner
+            L=$(sed -e 's/\..*Z//' <<< "$L")
+            # and finally, strip off any duplicate new line characters
+            L=$(tr -s "\n" <<< "$L")
+            printf '%s\r\n' "$L"
+        fi
+    done
 }
 
 tslogs() {
@@ -267,9 +302,9 @@ tslogs() {
         mkfifo $pipe
     fi
     # the sleep is a dirty hack to keep the pipe open
-    
-    sleep 10000 < /tmp/dkpipe.fifo &
-    tail -f "$LOG_PATH" &> /tmp/dkpipe.fifo &
+
+    sleep 10000 < $pipe &
+    tail -f "$LOG_PATH" &> $pipe &
     while true
     do
         if read -r line <$pipe; then
