@@ -191,6 +191,17 @@ start() {
 }
 
 replay() {
+    seed_running
+    if [[ $? == 0 ]]; then
+        echo $RED"WARNING: Your Steem server is currently running"$RESET
+        docker ps
+	read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
+        if [[ "$shouldstop" == "y" ]]; then
+		stop
+	else
+		return
+	fi
+    fi 
     echo "Removing old container"
     docker rm $DOCKER_NAME
     echo "Running steem with replay..."
@@ -209,6 +220,7 @@ shm_size() {
 stop() {
     echo $RED"Stopping container..."$RESET
     docker stop $DOCKER_NAME
+    echo $RED"Removing old container..."$RESET
     docker rm $DOCKER_NAME
 }
 
