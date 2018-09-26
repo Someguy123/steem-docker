@@ -270,7 +270,7 @@ tslogs() {
 	tail -f "$LOG_PATH" &> /tmp/dkpipe.fifo &
 	while true
 	do
-		if read line <$pipe; then
+		if read -r line <$pipe; then
 			jq -r ".time +\" \" + .log" <<<"$line" | sed -e "s/\r//" | tr -s "\n"
 		fi
 	done
