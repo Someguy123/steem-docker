@@ -250,7 +250,7 @@ logs() {
 }
 
 pclogs() {
-	docker logs -f -t --tail=20000 $DOCKER_NAME | grep "M free"
+	docker logs -f -t --tail=20000 $DOCKER_NAME | grep "M free" | sed -e 's/\..*Z//' | sed -e 's/[0-9]\+ms //'
 }
 
 tslogs() {
