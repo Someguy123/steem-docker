@@ -193,12 +193,15 @@ start() {
 replay() {
     seed_running
     if [[ $? == 0 ]]; then
-        echo $RED"WARNING: Your Steem server is currently running"$RESET
+        echo $RED"WARNING: Your Steem server ($DOCKER_NAME) is currently running"$RESET
+	echo
         docker ps
+	echo
 	read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
         if [[ "$shouldstop" == "y" ]]; then
 		stop
 	else
+		echo $GREEN"Did not say 'y'. Quitting."$RESET
 		return
 	fi
     fi 
