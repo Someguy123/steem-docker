@@ -254,7 +254,7 @@ pclogs() {
 }
 
 tslogs() {
-    if [[ ! $(command -v xz) ]]; then
+    if [[ ! $(command -v jq) ]]; then
         echo "jq not found. Attempting to install..."
         sudo apt update
         sudo apt install -y jq
