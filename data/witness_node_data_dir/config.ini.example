@@ -50,7 +50,9 @@ p2p-seed-node = steemseed-fin.privex.io:2001        # @privex (FI)
 # checkpoint =
 
 # Endpoint for websocket RPC to listen on
-rpc-endpoint = 0.0.0.0:8090
+
+webserver-http-endpoint = 0.0.0.0:8091
+webserver-ws-endpoint = 0.0.0.0:8090
 
 # Endpoint for TLS websocket RPC to listen on
 # rpc-tls-endpoint =
@@ -67,11 +69,8 @@ rpc-endpoint = 0.0.0.0:8090
 # API user specification, may be specified multiple times
 # api-user =
 
-# Set an API to be publicly available, may be specified multiple times
-public-api = database_api login_api
-
 # Plugin(s) to enable, may be specified multiple times
-enable-plugin = witness
+plugin = witness condenser_api network_broadcast_api rc_api account_by_key database_api
 
 # Defines a range of accounts to track as a json pair ["from","to"] [from,to)
 # track-account-range =
