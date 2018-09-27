@@ -304,7 +304,7 @@ tslogs() {
     # the sleep is a dirty hack to keep the pipe open
 
     sleep 10000 < $pipe &
-    tail -f "$LOG_PATH" &> $pipe &
+    tail -n 100 -f "$LOG_PATH" &> $pipe &
     while true
     do
         if read -r line <$pipe; then
