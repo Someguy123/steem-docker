@@ -45,6 +45,9 @@ for i in $PORTS; do
     fi
 done
 
+# load docker hub API
+source scripts/000_docker.sh
+
 help() {
     echo "Usage: $0 COMMAND [DATA]"
     echo
@@ -323,23 +326,165 @@ tslogs() {
     done
 }
 
+simplecommitlog() {
+    local commit_format;
+    local args;
+    commit_format=""
+    commit_format+="    - Commit %Cgreen%h%Creset - %s %n"
+    commit_format+="      Author: %Cblue%an%Creset %n"
+    commit_format+="      Date/Time: %Cblue%ai%Creset%n"
+    if [[ "$#" -lt 1 ]]; then
+        echo "Usage: simplecommitlog branch [num_commits]"
+        echo "invalid use of simplecommitlog. exiting"
+        exit -1
+    fi
+    branch="$1"
+    args="$branch"
+    if [[ "$#" -eq 2 ]]; then
+        count="$2"
+        args="-n $count $args"
+    fi
+    git log --pretty=format:"$commit_format" $args
+}
+
+ver() {
+    LINE="==========================="
+    ####
+    # Update git, so we can detect if we're outdated or not
+    # Also get the branch to warn people if they're not on master
+    ####
+    git remote update >/dev/null
+    current_branch=$(git branch | grep \* | cut -d ' ' -f2)
+    git_update=$(git status -uno)
+
+
+    ####
+    # Print out the current branch, commit and check upstream 
+    # to return commits that can be pulled
+    ####
+    echo "${BLUE}Current Steem-in-a-box version:${RESET}"
+    echo "    Branch: $current_branch"
+    if [[ "$current_branch" != "master" ]]; then
+        echo "${RED}WARNING: You're not on the master branch. This may prevent you from updating${RESET}"
+        echo "${GREEN}Fix: Run 'git checkout master' to change to the master branch${RESET}"
+    fi
+    # Warn user of modified core files
+    git_status=$(git status -s)
+    modified=0
+    while IFS='' read -r line || [[ -n "$line" ]]; do
+        if grep -q " M " <<< $line; then
+            modified=1
+        fi
+    done <<< "$git_status"
+    if [[ "$modified" -ne 0 ]]; then
+        echo "    ${RED}ERROR: Your steem-in-a-box core files have been modified (see 'git status'). You will not be able to update."
+        echo "    Fix: Run 'git reset --hard' to reset all core files back to their originals before updating."
+        echo "    This will not affect your running witness, or files such as config.ini which are supposed to be edited by the user${RESET}"
+    fi
+    echo "    ${BLUE}Current Commit:${RESET}"
+    simplecommitlog "$current_branch" 1
+    echo
+    echo
+    # Check for updates and let user know what's new
+    if grep -q "up-to-date" <<< "$gs"; then
+        echo "    ${GREEN}Your steem-in-a-box core files (run.sh, Dockerfile etc.) up to date${RESET}"
+    else
+        echo "    ${RED}Your steem-in-a-box core files (run.sh, Dockerfile etc.) are outdated!${RESET}"
+        echo
+        echo "    ${BLUE}Updates in the current published version of Steem-in-a-box:${RESET}"
+        simplecommitlog "HEAD..origin/master"
+        echo
+        echo
+        echo "    Fix: ${YELLOW}Please run 'git pull' to update your steem-in-a-box. This should not affect any running containers.${RESET}"
+    fi
+    echo $LINE
+
+    ####
+    # Show the currently installed image information
+    ####
+    echo "${BLUE}Steem image installed:${RESET}"
+    # Pretty printed docker image ID + creation date
+    dkimg_output=$(docker images -f "reference=steem:latest" --format "Tag: {{.Repository}}, Image ID: {{.ID}}, Created At: {{.CreatedSince}}")
+    # Just the image ID
+    dkimg_id=$(docker images -f "reference=steem:latest" --format "{{.ID}}")
+    # Used later on, for commands that depend on the image existing
+    got_dkimg=0
+    if [[ $(wc -c <<< "$dkimg_output") -lt 10 ]]; then
+        echo "${RED}WARNING: We could not find the currently installed image (steem:lateset)${RESET}"
+        echo "${RED}Make sure it's installed with './run.sh install' or './run.sh build'${RESET}"
+    else
+        echo "    $dkimg_output"
+        got_dkimg=1
+        echo "${BLUE}Checking for updates...${RESET}"
+        remote_docker_id="$(get_latest_id)"
+        if [[ "$?" == 0 ]]; then
+            remote_docker_id="${remote_docker_id:7:12}"
+            if [[ "$remote_docker_id" != "$dkimg_id" ]]; then
+                echo "    ${YELLOW}An update is available for your Steem installation"
+                echo "    Your image ID: $dkimg_id    Image ID on Docker Hub: ${remote_docker_id}"
+                echo "    NOTE: If you have built manually with './run.sh build', your image will not match docker hub."
+                echo "    To update, use ./run.sh install - a replay may or may not be required (ask in #witness on steem.chat)${RESET}"
+            else
+                echo "${GREEN}Your installed docker image ($dkimg_id) matches Docker Hub ($remote_docker_id)"
+                echo "You're running the latest version of Steem from @someguy123's builds${RESET}"
+            fi
+        else
+            echo "    ${YELLOW}An error occurred while checking for updates${RESET}"
+        fi
+
+    fi
+
+    echo $LINE
+
+
+    echo "${BLUE}Steem version currently running:${RESET}"
+    # Verify that the container exists, even if it's stopped
+    if seed_exists; then
+        _container_image_id=$(docker inspect "$DOCKER_NAME" -f '{{.Image}}')
+        # Truncate the long SHA256 sum to the standard 12 character image ID
+        container_image_id="${_container_image_id:7:12}"
+        echo "    Container $DOCKER_NAME is running on docker image ID ${container_image_id}"
+        # If the docker image check was successful earlier, then compare the image to the current container 
+        if [[ "$got_dkimg" == 1 ]]; then
+            if [[ "$container_image_id" == "$dkimg_id" ]]; then
+                echo "    ${GREEN}Container $DOCKER_NAME is running image $container_image_id, which matches steem:latest ($dkimg_id)"
+                echo "    Your container will not change Steem version on restart${RESET}"
+            else
+                echo "    ${YELLOW}Warning: Container $DOCKER_NAME is running image $container_image_id, which DOES NOT MATCH steem:latest ($dkimg_id)"
+                echo "    Your container may change Steem version on restart${RESET}"
+            fi
+        else
+            echo "    ${YELLOW}Could not get installed image earlier. Skipping image/container comparison.${RESET}"
+        fi
+        echo "    ...scanning logs to discover blockchain version - this may take 30 seconds or more"
+        l=$(docker logs "$DOCKER_NAME")
+        if grep -q "blockchain version" <<< "$l"; then
+            echo "  " $(grep "blockchain version" <<< "$l")
+        else
+            echo "    ${RED}Could not identify blockchain version. Not found in logs for '$DOCKER_NAME'${RESET}"
+        fi
+    else
+        echo "    ${RED}Unfortunately your Steem container doesn't exist (start it with ./run.sh start or replay)..."
+        echo "    We can't identify your blockchain version unless the container has been started at least once${RESET}"
+    fi
+
+}
+
 status() {
     
-    seed_exists
-    if [[ $? == 0 ]]; then
+    if seed_exists; then
         echo "Container exists?: "$GREEN"YES"$RESET
     else
         echo "Container exists?: "$RED"NO (!)"$RESET 
-        echo "Container doesn't exist, thus it is NOT running. Run $0 build && $0 start"$RESET
+        echo "Container doesn't exist, thus it is NOT running. Run '$0 install && $0 start'"$RESET
         return
     fi
 
-    seed_running
-    if [[ $? == 0 ]]; then
+    if seed_running; then
         echo "Container running?: "$GREEN"YES"$RESET
     else
         echo "Container running?: "$RED"NO (!)"$RESET
-        echo "Container isn't running. Start it with $0 start"$RESET
+        echo "Container isn't running. Start it with '$0 start' or '$0 replay'"$RESET
         return
     fi
 
@@ -418,8 +563,12 @@ case $1 in
     tslogs)
         tslogs
         ;;
+    ver)
+        ver
+        ;;
     *)
         echo "Invalid cmd"
         help
         ;;
 esac
+
