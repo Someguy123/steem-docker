@@ -386,7 +386,7 @@ ver() {
     echo
     echo
     # Check for updates and let user know what's new
-    if grep -q "up-to-date" <<< "$gs"; then
+    if grep -q "up-to-date" <<< "$git_update"; then
         echo "    ${GREEN}Your steem-in-a-box core files (run.sh, Dockerfile etc.) up to date${RESET}"
     else
         echo "    ${RED}Your steem-in-a-box core files (run.sh, Dockerfile etc.) are outdated!${RESET}"
