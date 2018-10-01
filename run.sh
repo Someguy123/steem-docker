@@ -121,14 +121,14 @@ dlblocks() {
     sudo rm -f $DATADIR/witness_node_data_dir/blockchain/block_log
     sudo rm -f $DATADIR/witness_node_data_dir/blockchain/block_log.index
     echo "Download @gtg's block logs..."
-    if [[ ! $(command -v xz) ]]; then
-        echo "XZ not found. Attempting to install..."
+    if [[ ! $(command -v pixz) ]]; then
+        echo "PIXZ not found. Attempting to install..."
         sudo apt update
-        sudo apt install -y xz-utils
+        sudo apt install -y pixz 
     fi
     wget https://gtg.steem.house/get/blockchain.xz/block_log.xz -O $DATADIR/witness_node_data_dir/blockchain/block_log.xz
     echo "Decompressing block log... this may take a while..."
-    xz -d $DATADIR/witness_node_data_dir/blockchain/block_log.xz -v
+    pixz -d $DATADIR/witness_node_data_dir/blockchain/block_log.xz $DATADIR/witness_node_data_dir/blockchain/block_log
     echo "FINISHED. Blockchain downloaded and decompressed"
     echo "Remember to resize your /dev/shm, and run with replay!"
     echo "$ ./run.sh shm_size SIZE (e.g. 8G)"
