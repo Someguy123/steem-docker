@@ -10,8 +10,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DATADIR="$DIR/data"}
 : ${DOCKER_NAME="seed"}
 
-# blockchain folder, used by dlblocks
-: ${BC_FOLDER="$DATADIR/witness_node_data_dir/blockchain"}
 
 # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
 : ${BC_HTTP="http://files.privex.io/steem/block_log.lz4"}
@@ -45,6 +43,9 @@ RESET="$(tput sgr0)"
 if [[ -f .env ]]; then
     source .env
 fi
+
+# blockchain folder, used by dlblocks
+: ${BC_FOLDER="$DATADIR/witness_node_data_dir/blockchain"}
 
 : ${EXAMPLE_CONF="$DATADIR/witness_node_data_dir/config.ini.example"}
 : ${CONF_FILE="$DATADIR/witness_node_data_dir/config.ini"}
