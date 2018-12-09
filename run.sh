@@ -10,6 +10,21 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DATADIR="$DIR/data"}
 : ${DOCKER_NAME="seed"}
 
+# blockchain folder, used by dlblocks
+: ${BC_FOLDER="$DATADIR/witness_node_data_dir/blockchain"}
+
+# HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
+: ${BC_HTTP="http://files.privex.io/steem/block_log.lz4"}
+
+# Compression type, can be "xz", "lz4", or "no" (for no compression)
+# Uses on-the-fly de-compression while downloading, to conserve disk space
+# and save time by not having to decompress after the download is finished
+: ${BC_HTTP_CMP="lz4"}
+
+# Anonymous rsync daemon URL to the raw block_log, for repairing/resuming
+# a damaged/incomplete block_log. Set to "no" to disable rsync when resuming.
+: ${BC_RSYNC="rsync://files.privex.io/steem/block_log"}
+
 BOLD="$(tput bold)"
 RED="$(tput setaf 1)"
 GREEN="$(tput setaf 2)"
@@ -177,44 +192,160 @@ build_full() {
     docker build -t steem .
 }
 
-# Usage: ./run.sh dlblocks
-# Download the block_log from a remote server and de-compress it (if needed).
-# Places it correctly into $DATADIR
+# Usage: ./run.sh dlblocks [override_dlmethod] [url] [compress]
+# Download the block_log from a remote server and de-compress it on-the-fly to save space, 
+# then places it correctly into $BC_FOLDER
+# Automatically attempts to resume partially downloaded block_log's using rsync, or http if
+# rsync is disabled in .env
+# 
+#   override_dlmethod - use this to force downloading a certain way (OPTIONAL)
+#                     choices:
+#                       - rsync - download via rsync, resume if exists, using append-verify and ignore times
+#                       - rsync-replace - download whole file via rsync, delete block_log before download
+#                       - http - download via http. if uncompressed, try to resume when possible
+#                       - http-replace - do not attempt to resume. delete block_log before download
+#
+#   url - Download/install block log using the supplied dlmethod from this url. (OPTIONAL)
+#
+#   compress -  Only valid for http/http-replace. Decompress the file on the fly. (OPTIONAL)
+#               options: xz, lz4, no (no compression) 
+#               if a custom url is supplied, but no compression method, it is assumed it is raw and not compressed.
+#
+# Example: The default compressed lz4 download failed, but left it's block_log in place. 
+# You don't want to use rsync to resume, because your network is very fast
+# Instead, you can continue your download using the uncompressed version over HTTP:
+#
+#   ./run.sh dlblocks http "http://files.privex.io/steem/block_log"
+#
+# Or just re-download the whole uncompressed file instead of resuming:
+#
+#   ./run.sh dlblocks http-replace "http://files.privex.io/steem/block_log"
+#
 dlblocks() {
     pkg_not_found rsync rsync
     pkg_not_found lz4 liblz4-tool
     pkg_not_found xz xz-utils
-    local bc_folder="$DATADIR/witness_node_data_dir/blockchain"
-    local bc_raw_rsync="rsync://files.privex.io/steem/block_log"
-    local bc_lz4_http="http://files.privex.io/steem/block_log.lz4"
+    
+    [[ ! -d "$BC_FOLDER" ]] && mkdir -p "$BC_FOLDER"
+    [[ -f "$BC_FOLDER/block_log.index" ]] && echo "Removing old block index" && sudo rm -vf "$BC_FOLDER/block_log.index" 2> /dev/null
 
-    [[ ! -d "$bc_folder" ]] && mkdir -p "$bc_folder"
-    [[ -f "$bc_folder/block_log.index" ]] && echo "Removing old block index" && sudo rm -vf "$bc_folder/block_log.index" 2> /dev/null
+    if (( $# > 0 )); then
+        custom-dlblocks "$@"
+        return $?
+    fi
     if [[ -f "$bc_folder/block_log" ]]; then
         echo "${YELLOW}It looks like block_log already exists${RESET}"
-        echo "${GREEN}We'll now use rsync to attempt to repair any corruption, or missing pieces from your block_log.${RESET}"
-        echo "This may take a while, and may at times appear to be stalled. Be patient, it takes time to scan the differences."
-        echo -e "${BOLD}Downloading via:${RESET}\t${bc_raw_rsync}"
-        echo -e "${BOLD}Writing to:${RESET}\t\t${bc_folder}/block_log"
-        rsync -Ivh --append-verify --progress "$bc_raw_rsync" "$bc_folder/block_log" 2> /dev/null
-        return
+        if [[ "$BC_RSYNC" == "no" ]]; then
+            echo "${RED}As BC_RSYNC is set to 'no', we're just going to try to retry the http download${RESET}"
+            echo "If your HTTP source is uncompressed, we'll try to resume it"
+            dl-blocks-http "$BC_HTTP" "$BC_HTTP_CMP"
+            return
+        else
+            echo "${GREEN}We'll now use rsync to attempt to repair any corruption, or missing pieces from your block_log.${RESET}"
+            dl-blocks-rsync "$BC_RSYNC"
+            return
+        fi
     fi
     echo "No existing block_log found. Will use standard http to download, and will also 
     decompress lz4 while downloading, to save time."
     echo "If you encounter an error while downloading the block_log, just run dlblocks again, 
     and it will use rsync to resume and repair it"
-    echo -e "\n==============================================================="
-    echo -e "${BOLD}Downloading via:${RESET}\t${bc_lz4_http}"
-    echo -e "${BOLD}Writing to:${RESET}\t\t${bc_folder}/block_log"
-    echo -e "===============================================================\n"
-    echo "${GREEN}${BOLD}Downloading and de-compressing block log on-the-fly...${RESET}"
-    wget "$bc_lz4_http" -O - | lz4 -d - "$bc_folder/block_log"
-    echo "FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
+    dl-blocks-http 
+    echo "FINISHED. Blockchain installed to ${BC_FOLDER}/block_log (make sure to check for any errors above)"
     echo "${RED}If you encountered an error while downloading the block_log, just run dlblocks again
     and it will use rsync to resume and repair it${RESET}"
     echo "Remember to resize your /dev/shm, and run with replay!"
     echo "$ ./run.sh shm_size SIZE (e.g. 8G)"
     echo "$ ./run.sh replay"
+}
+
+custom-dlblocks() {
+    local compress="no" # to be overriden if we have 2+ args
+    local dlvia="$1"
+    if (( $# > 1 )); then
+        local url="$2"
+    else
+        local url=$(if [[ "$dlvia" == "rsync" ]]; then echo "$BC_RSYNC"; else echo "$BC_HTTP")
+        local compress="$BC_HTTP_CMP"
+    fi
+    (( $# >= 3 )) && local compress="$3"
+
+    case "$dlvia" in
+        rsync)
+            dl-blocks-rsync "$url"
+            return
+            ;;
+        rsync-replace)
+            echo "Removing old block_log..."
+            sudo rm -vf "$BC_FOLDER/block_log"
+            dl-blocks-rsync "$url"
+            return
+            ;;
+        http)
+            dl-blocks-http "$url" "$compress"
+            return
+            ;;
+        http-replace)
+            echo "Removing old block_log..."
+            sudo rm -vf "$BC_FOLDER/block_log"
+            dl-blocks-http "$url" "$compress"
+            return
+            ;;
+    esac 
+}
+
+# Internal use
+# Usage: dl-blocks-rsync blocklog_url
+dl-blocks-rsync() {
+    local url="$1"
+    echo "This may take a while, and may at times appear to be stalled. ${YELLOW}${BOLD}Be patient, it takes time (3 to 10 mins) to scan the differences.${RESET}"
+    echo "Once it detects the differences, it will download at very high speed depending on how much of your block_log is intact."
+    echo -e "\n==============================================================="
+    echo -e "${BOLD}Downloading via:${RESET}\t${bc_raw_rsync}"
+    echo -e "${BOLD}Writing to:${RESET}\t\t${bc_folder}/block_log"
+    echo -e "===============================================================\n"
+    # I = ignore timestamps and size, vv = be more verbose, h = human readable
+    # append-verify = attempt to append to the file, but make sure to verify the existing pieces match the server
+    rsync -Ivvh --append-verify --progress "$url" "${bc_folder}/block_log" 2> /dev/null
+}
+
+# Internal use
+# Usage: dl-blocks-http blocklog_url [compress_type]
+dl-blocks-http() {
+    local url="$1"
+    local compression="no"
+    (( $# < 1 )) && echo "ERROR: no url specified for dl-blocks-http"
+    if (( $# == 2 )); then
+        compression="$2"
+        if [[ "$2" != "lz4" && "$2" != "xz" && "$2" != "no" ]]; then
+            echo "${RED}ERROR: Unknown compression type '$2' passed to dl-blocks-http.${RESET}"
+            echo "Please correct your http compression type."
+            echo "Choices: lz4, xz, no (for uncompressed)"
+            return 1
+        fi
+    fi
+    echo -e "\n==============================================================="
+    echo -e "${BOLD}Downloading via:${RESET}\t${bc_lz4_http}"
+    echo -e "${BOLD}Writing to:${RESET}\t\t${bc_folder}/block_log"
+    [[ "$compression" != "no" ]] && \
+        echo -e "${BOLD}Compression:${RESET}\t\t$compression"
+    echo -e "===============================================================\n"
+
+    [ [[ "$compression" != "no" ]] && echo "${GREEN}${BOLD}Downloading and de-compressing block log on-the-fly...${RESET}" ] || \
+        echo "${GREEN}${BOLD}Downloading raw block log...${RESET}"
+
+    case "$compression" in 
+        lz4)
+            wget "$url" -O - | lz4 -dv - "$BC_FOLDER/block_log"
+            ;;
+        xz)
+            wget "$url" -O - | xz -dvv - "$BC_FOLDER/block_log"
+            ;;
+        no)
+            wget -c "$url" -O "$BC_FOLDER/block_log"
+            ;;
+    esac
+    echo "FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
 }
 
 # Usage: ./run.sh install_docker
@@ -733,7 +864,7 @@ case $1 in
         remote_wallet "${@:2}"
         ;;
     dlblocks)
-        dlblocks 
+        dlblocks "${@:2}"
         ;;
     enter)
         enter
