@@ -86,6 +86,28 @@ help() {
     exit
 }
 
+APT_UPDATED="n"
+pkg_not_found() {
+    # check if a command is available
+    # if not, install it from the package specified
+    # Usage: pkg_not_found [cmd] [apt-package]
+    # e.g. pkg_not_found git git
+    if [[ $# -lt 2 ]]; then
+        echo "${RED}ERR: pkg_not_found requires 2 arguments (cmd) (package)${NORMAL}"
+        exit
+    fi
+    local cmd=$1
+    local pkg=$2
+    if ! [ -x "$(command -v $cmd)" ]; then
+        echo "${YELLOW}WARNING: Command $cmd was not found. installing now...${NORMAL}"
+        if [[ "$APT_UPDATED" == "n" ]]; then
+            sudo apt update -y
+            APT_UPDATED="y"
+        fi
+        sudo apt install -y "$pkg"
+    fi
+}
+
 optimize() {
     echo    75 | sudo tee /proc/sys/vm/dirty_background_ratio
     echo  1000 | sudo tee /proc/sys/vm/dirty_expire_centisecs
@@ -159,22 +181,37 @@ build_full() {
 # Download the block_log from a remote server and de-compress it (if needed).
 # Places it correctly into $DATADIR
 dlblocks() {
-    if [[ ! -d "$DATADIR/witness_node_data_dir/blockchain" ]]; then
-        mkdir "$DATADIR/witness_node_data_dir/blockchain"
+    pkg_not_found rsync rsync
+    pkg_not_found lz4 liblz4-tool
+    pkg_not_found xz xz-utils
+    local bc_folder="$DATADIR/witness_node_data_dir/blockchain"
+    local bc_raw_rsync="rsync://files.privex.io/steem/block_log"
+    local bc_lz4_http="http://files.privex.io/steem/block_log.lz4"
+
+    [[ ! -d "$bc_folder" ]] && mkdir -p "$bc_folder"
+    [[ -f "$bc_folder/block_log.index" ]] && echo "Removing old block index" && sudo rm -vf "$bc_folder/block_log.index" 2> /dev/null
+    if [[ -f "$bc_folder/block_log" ]]; then
+        echo "${YELLOW}It looks like block_log already exists${RESET}"
+        echo "${GREEN}We'll now use rsync to attempt to repair any corruption, or missing pieces from your block_log.${RESET}"
+        echo "This may take a while, and may at times appear to be stalled. Be patient, it takes time to scan the differences."
+        echo -e "${BOLD}Downloading via:${RESET}\t${bc_raw_rsync}"
+        echo -e "${BOLD}Writing to:${RESET}\t\t${bc_folder}/block_log"
+        rsync -Ivh --append-verify --progress "$bc_raw_rsync" "$bc_folder/block_log" 2> /dev/null
+        return
     fi
-    echo "Removing old block log"
-    sudo rm -f $DATADIR/witness_node_data_dir/blockchain/block_log
-    sudo rm -f $DATADIR/witness_node_data_dir/blockchain/block_log.index
-    echo "Download @gtg's block logs..."
-    if [[ ! $(command -v xz) ]]; then
-        echo "XZ not found. Attempting to install..."
-        sudo apt update
-        sudo apt install -y xz-utils
-    fi
-    wget https://gtg.steem.house/get/blockchain.xz/block_log.xz -O $DATADIR/witness_node_data_dir/blockchain/block_log.xz
-    echo "Decompressing block log... this may take a while..."
-    xz -d $DATADIR/witness_node_data_dir/blockchain/block_log.xz -v
-    echo "FINISHED. Blockchain downloaded and decompressed"
+    echo "No existing block_log found. Will use standard http to download, and will also 
+    decompress lz4 while downloading, to save time."
+    echo "If you encounter an error while downloading the block_log, just run dlblocks again, 
+    and it will use rsync to resume and repair it"
+    echo -e "\n==============================================================="
+    echo -e "${BOLD}Downloading via:${RESET}\t${bc_lz4_http}"
+    echo -e "${BOLD}Writing to:${RESET}\t\t${bc_folder}/block_log"
+    echo -e "===============================================================\n"
+    echo "${GREEN}${BOLD}Downloading and de-compressing block log on-the-fly...${RESET}"
+    wget "$bc_lz4_http" -O - | lz4 -d - "$bc_folder/block_log"
+    echo "FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
+    echo "${RED}If you encountered an error while downloading the block_log, just run dlblocks again
+    and it will use rsync to resume and repair it${RESET}"
     echo "Remember to resize your /dev/shm, and run with replay!"
     echo "$ ./run.sh shm_size SIZE (e.g. 8G)"
     echo "$ ./run.sh replay"
