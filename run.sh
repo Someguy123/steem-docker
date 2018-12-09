@@ -5,10 +5,10 @@
 #
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-DOCKER_DIR="$DIR/dkr"
-FULL_DOCKER_DIR="$DIR/dkr_fullnode"
-DATADIR="$DIR/data"
-DOCKER_NAME="seed"
+: ${DOCKER_DIR="$DIR/dkr"}
+: ${FULL_DOCKER_DIR="$DIR/dkr_fullnode"}
+: ${DATADIR="$DIR/data"}
+: ${DOCKER_NAME="seed"}
 
 BOLD="$(tput bold)"
 RED="$(tput setaf 1)"
@@ -20,21 +20,33 @@ CYAN="$(tput setaf 6)"
 WHITE="$(tput setaf 7)"
 RESET="$(tput sgr0)"
 : ${DK_TAG="someguy123/steem:latest"}
-DK_TAG_FULL=someguy123/steem:latest-full
 : ${DK_TAG_FULL="someguy123/steem:latest-full"}
-SHM_DIR=/dev/shm
+: ${SHM_DIR="/dev/shm"}
 : ${REMOTE_WS="wss://steemd.privex.io"}
 
 # default. override in .env
-PORTS="2001"
+: ${PORTS="2001"}
 
 if [[ -f .env ]]; then
     source .env
 fi
 
-if [[ ! -f data/witness_node_data_dir/config.ini ]]; then
-    echo "config.ini not found. copying example (seed)";
-    cp data/witness_node_data_dir/config.ini.example data/witness_node_data_dir/config.ini
+: ${EXAMPLE_CONF="$DATADIR/witness_node_data_dir/config.ini.example"}
+: ${CONF_FILE="$DATADIR/witness_node_data_dir/config.ini"}
+
+# if the config file doesn't exist, try copying the example config
+if [[ ! -f "$CONF_FILE" ]]; then
+    if [[ -f "$EXAMPLE_CONF" ]]; then
+        echo "${YELLOW}File config.ini not found. copying example (seed)${RESET}"
+        cp -v "$DATADIR/witness_node_data_dir/config.ini.example" "$DATADIR/witness_node_data_dir/config.ini" 
+        echo "${GREEN} > Successfully installed example config for seed node.${RESET}"
+        echo " > You may want to adjust this if you're running a witness, e.g. disable p2p-endpoint"
+    else
+        echo "${YELLOW}WARNING: You don't seem to have a config file and the example config couldn't be found...${RESET}"
+        echo "${YELLOW}${BOLD}You may want to check these files exist, or you won't be able to launch Steem${RESET}"
+        echo "Example Config: $EXAMPLE_CONF"
+        echo "Main Config: $CONF_FILE"
+    fi
 fi
 
 IFS=","
