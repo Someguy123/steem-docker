@@ -301,12 +301,12 @@ dl-blocks-rsync() {
     echo "This may take a while, and may at times appear to be stalled. ${YELLOW}${BOLD}Be patient, it takes time (3 to 10 mins) to scan the differences.${RESET}"
     echo "Once it detects the differences, it will download at very high speed depending on how much of your block_log is intact."
     echo -e "\n==============================================================="
-    echo -e "${BOLD}Downloading via:${RESET}\t${bc_raw_rsync}"
-    echo -e "${BOLD}Writing to:${RESET}\t\t${bc_folder}/block_log"
+    echo -e "${BOLD}Downloading via:${RESET}\t${url}"
+    echo -e "${BOLD}Writing to:${RESET}\t\t${BC_FOLDER}/block_log"
     echo -e "===============================================================\n"
     # I = ignore timestamps and size, vv = be more verbose, h = human readable
     # append-verify = attempt to append to the file, but make sure to verify the existing pieces match the server
-    rsync -Ivvh --append-verify --progress "$url" "${bc_folder}/block_log" 2> /dev/null
+    rsync -Ivvh --append-verify --progress "$url" "${BC_FOLDER}/block_log"
 }
 
 # Internal use
