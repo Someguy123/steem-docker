@@ -262,34 +262,41 @@ and it will use rsync to resume and repair it"
 custom-dlblocks() {
     local compress="no" # to be overriden if we have 2+ args
     local dlvia="$1"
+    local url;
+
     if (( $# > 1 )); then
-        local url="$2"
+        url="$2"
     else
-        local url=$(if [[ "$dlvia" == "rsync" ]]; then echo "$BC_RSYNC"; else echo "$BC_HTTP")
-        local compress="$BC_HTTP_CMP"
+        if [[ "$dlvia" == "rsync" ]]; then url="$BC_RSYNC"; else url="$BC_HTTP"; fi
+        compress="$BC_HTTP_CMP"
     fi
-    (( $# >= 3 )) && local compress="$3"
+    (( $# >= 3 )) && compress="$3"
 
     case "$dlvia" in
         rsync)
             dl-blocks-rsync "$url"
-            return
+            return $?
             ;;
         rsync-replace)
             echo "Removing old block_log..."
             sudo rm -vf "$BC_FOLDER/block_log"
             dl-blocks-rsync "$url"
-            return
+            return $?
             ;;
         http)
             dl-blocks-http "$url" "$compress"
-            return
+            return $? 
             ;;
         http-replace)
             echo "Removing old block_log..."
             sudo rm -vf "$BC_FOLDER/block_log"
             dl-blocks-http "$url" "$compress"
-            return
+            return $?
+            ;;
+        *)
+            echo "Invalid download method"
+            echo "Valid options are http, http-replace, rsync, or rsync-replace"
+            return 1
             ;;
     esac 
 }
