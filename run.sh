@@ -233,7 +233,7 @@ dlblocks() {
         custom-dlblocks "$@"
         return $?
     fi
-    if [[ -f "$bc_folder/block_log" ]]; then
+    if [[ -f "$BC_FOLDER/block_log" ]]; then
         echo "${YELLOW}It looks like block_log already exists${RESET}"
         if [[ "$BC_RSYNC" == "no" ]]; then
             echo "${RED}As BC_RSYNC is set to 'no', we're just going to try to retry the http download${RESET}"
@@ -247,10 +247,10 @@ dlblocks() {
         fi
     fi
     echo "No existing block_log found. Will use standard http to download, and will also 
-    decompress lz4 while downloading, to save time."
+decompress lz4 while downloading, to save time."
     echo "If you encounter an error while downloading the block_log, just run dlblocks again, 
-    and it will use rsync to resume and repair it"
-    dl-blocks-http 
+and it will use rsync to resume and repair it"
+    dl-blocks-http "$BC_HTTP" 
     echo "FINISHED. Blockchain installed to ${BC_FOLDER}/block_log (make sure to check for any errors above)"
     echo "${RED}If you encountered an error while downloading the block_log, just run dlblocks again
     and it will use rsync to resume and repair it${RESET}"
