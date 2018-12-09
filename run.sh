@@ -250,7 +250,7 @@ dlblocks() {
 decompress lz4 while downloading, to save time."
     echo "If you encounter an error while downloading the block_log, just run dlblocks again, 
 and it will use rsync to resume and repair it"
-    dl-blocks-http "$BC_HTTP" 
+    dl-blocks-http "$BC_HTTP" "$BC_HTTP_CMP" 
     echo "FINISHED. Blockchain installed to ${BC_FOLDER}/block_log (make sure to check for any errors above)"
     echo "${RED}If you encountered an error while downloading the block_log, just run dlblocks again
     and it will use rsync to resume and repair it${RESET}"
