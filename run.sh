@@ -63,24 +63,25 @@ source scripts/000_docker.sh
 help() {
     echo "Usage: $0 COMMAND [DATA]"
     echo
-    echo "Commands: "
-    echo "    start - starts steem container"
-    echo "    dlblocks - download and decompress the blockchain to speed up your first start"
-    echo "    replay - starts steem container (in replay mode)"
-    echo "    shm_size - resizes /dev/shm to size given, e.g. ./run.sh shm_size 10G "
-    echo "    stop - stops steem container"
-    echo "    status - show status of steem container"
-    echo "    restart - restarts steem container"
-    echo "    install_docker - install docker"
-    echo "    install - pulls latest docker image from server (no compiling)"
-    echo "    install_full - pulls latest (FULL NODE FOR RPC) docker image from server (no compiling)"
-    echo "    rebuild - builds steem container (from docker file), and then restarts it"
-    echo "    build - only builds steem container (from docker file)"
-    echo "    logs - show all logs inc. docker logs, and steem logs"
-    echo "    wallet - open cli_wallet in the container"
-    echo "    remote_wallet - open cli_wallet in the container connecting to a remote seed"
-    echo "    enter - enter a bash session in the currently running container"
-    echo "    shell - launch the steem container with appropriate mounts, then open bash for inspection"
+    echo "Commands: 
+    start - starts steem container
+    dlblocks - download and decompress the blockchain to speed up your first start
+    replay - starts steem container (in replay mode)
+    shm_size - resizes /dev/shm to size given, e.g. ./run.sh shm_size 10G 
+    stop - stops steem container
+    status - show status of steem container
+    restart - restarts steem container
+    install_docker - install docker
+    install - pulls latest docker image from server (no compiling)
+    install_full - pulls latest (FULL NODE FOR RPC) docker image from server (no compiling)
+    rebuild - builds steem container (from docker file), and then restarts it
+    build - only builds steem container (from docker file)
+    logs - show all logs inc. docker logs, and steem logs
+    wallet - open cli_wallet in the container
+    remote_wallet - open cli_wallet in the container connecting to a remote seed
+    enter - enter a bash session in the currently running container
+    shell - launch the steem container with appropriate mounts, then open bash for inspection
+    "
     echo
     exit
 }
@@ -92,43 +93,74 @@ optimize() {
     echo 30000 | sudo tee /proc/sys/vm/dirty_writeback_centisecs
 }
 
+# Build standard low memory node as a docker image
+# Usage: ./run.sh build [version]
+# Version is prefixed with v, matching steem releases
+# e.g. build v0.20.6
 build() {
     if (( $# == 1 )); then
-	BUILD_VER=$1
-	echo $BLUE"CUSTOM BUILD SPECIFIED. Building from branch/tag $BUILD_VER"$RESET
-	sleep 2
-	cd $DOCKER_DIR
-	CUST_TAG="steem:$BUILD_VER"
+        BUILD_VER=$1
+        echo "${BLUE}CUSTOM BUILD SPECIFIED. Building from branch/tag ${BUILD_VER}${RESET}"
+        sleep 2
+        cd $DOCKER_DIR
+        CUST_TAG="steem:$BUILD_VER"
         docker build --build-arg "steemd_version=$BUILD_VER" -t "$CUST_TAG" .
-	echo $RED"For your safety, we've tagged this image as $CUST_TAG"$RESET
-	echo $RED"To use it in this steem-docker, run: docker tag $CUST_TAG steem:latest"$RESET
-	return
+        echo "${RED}
+    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
+    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
+        For your safety, we've tagged this image as $CUST_TAG
+        To use it in this steem-docker, run: 
+        ${GREEN}${BOLD}
+        docker tag $CUST_TAG steem:latest
+        ${RESET}${RED}
+    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
+    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
+        ${RESET}
+        "
+        return
     fi
     echo $GREEN"Building docker container"$RESET
     cd $DOCKER_DIR
     docker build -t steem .
 }
 
+# Build full memory node (for RPC nodes) as a docker image
+# Usage: ./run.sh build_full [version]
+# Version is prefixed with v, matching steem releases
+# e.g. build_full v0.20.6
 build_full() {
     if (( $# == 1 )); then
-	BUILD_VER=$1
-	echo $BLUE"CUSTOM (FULL NODE) BUILD SPECIFIED. Building from branch/tag $BUILD_VER"$RESET
-	sleep 2
-	cd $FULL_DOCKER_DIR
-	CUST_TAG="steem:$BUILD_VER"
+        BUILD_VER=$1
+        echo $BLUE"CUSTOM (FULL NODE) BUILD SPECIFIED. Building from branch/tag $BUILD_VER"$RESET
+        sleep 2
+        cd $FULL_DOCKER_DIR
+        CUST_TAG="steem:$BUILD_VER-full"
         docker build --build-arg "steemd_version=$BUILD_VER" -t "$CUST_TAG" .
-	echo $RED"For your safety, we've tagged this image as $CUST_TAG"$RESET
-	echo $RED"To use it in this steem-docker, run: docker tag $CUST_TAG steem:latest"$RESET
-	return
+        echo "${RED}
+    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
+    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
+        For your safety, we've tagged this image as $CUST_TAG
+        To use it in this steem-docker, run: 
+        ${GREEN}${BOLD}
+        docker tag $CUST_TAG steem:latest
+        ${RESET}${RED}
+    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
+    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
+        ${RESET}
+        "
+        return
     fi
     echo $GREEN"Building full-node docker container"$RESET
     cd $FULL_DOCKER_DIR
     docker build -t steem .
 }
 
+# Usage: ./run.sh dlblocks
+# Download the block_log from a remote server and de-compress it (if needed).
+# Places it correctly into $DATADIR
 dlblocks() {
-    if [[ ! -d "$DATADIR/blockchain" ]]; then
-        mkdir "$DATADIR/blockchain"
+    if [[ ! -d "$DATADIR/witness_node_data_dir/blockchain" ]]; then
+        mkdir "$DATADIR/witness_node_data_dir/blockchain"
     fi
     echo "Removing old block log"
     sudo rm -f $DATADIR/witness_node_data_dir/blockchain/block_log
@@ -148,9 +180,13 @@ dlblocks() {
     echo "$ ./run.sh replay"
 }
 
+# Usage: ./run.sh install_docker
+# Downloads and installs the latest version of Docker using the Get Docker site
+# If Docker is already installed, it should update it.
 install_docker() {
     sudo apt update
-    sudo apt install curl git
+    # curl/git used by docker, xz/lz4 used by dlblocks, jq used by tslogs/pclogs
+    sudo apt install curl git xz-utils liblz4-tool jq
     curl https://get.docker.com | sh
     if [ "$EUID" -ne 0 ]; then 
         echo "Adding user $(whoami) to docker group"
@@ -159,9 +195,18 @@ install_docker() {
     fi
 }
 
+# Usage: ./run.sh install [tag]
+# Downloads the Steem low memory node image from someguy123's official builds, or a custom tag if supplied
+#
+#   tag - optionally specify a docker tag to install from. can be third party
+#         format: user/repo:version    or   user/repo   (uses the 'latest' tag)
+#
+# If no tag specified, it will download the pre-set $DK_TAG in run.sh or .env
+# Default tag is normally someguy123/steem:latest (official builds by the creator of steem-docker).
+#
 install() {
     if (( $# == 1 )); then
-	DK_TAG=$1
+        DK_TAG=$1
     fi
     echo $BLUE"NOTE: You are installing image $DK_TAG. Please make sure this is correct."$RESET
     sleep 2
@@ -171,6 +216,10 @@ install() {
     echo "Installation completed. You may now configure or run the server"
 }
 
+# Usage: ./run.sh install_full
+# Downloads the Steem full node image from the pre-set $DK_TAG_FULL in run.sh or .env
+# Default tag is normally someguy123/steem:latest-full (official builds by the creator of steem-docker).
+#
 install_full() {
     echo "Loading image from someguy123/steem"
     docker pull $DK_TAG_FULL 
@@ -178,6 +227,12 @@ install_full() {
     docker tag $DK_TAG_FULL steem
     echo "Installation completed. You may now configure or run the server"
 }
+
+# Internal Use Only
+# Checks if the container $DOCKER_NAME exists. Returns 0 if it does, -1 if not.
+# Usage:
+# if seed_exists; then echo "true"; else "false"; fi
+#
 seed_exists() {
     seedcount=$(docker ps -a -f name="^/"$DOCKER_NAME"$" | wc -l)
     if [[ $seedcount -eq 2 ]]; then
@@ -187,6 +242,11 @@ seed_exists() {
     fi
 }
 
+# Internal Use Only
+# Checks if the container $DOCKER_NAME is running. Returns 0 if it's running, -1 if not.
+# Usage:
+# if seed_running; then echo "true"; else "false"; fi
+#
 seed_running() {
     seedcount=$(docker ps -f 'status=running' -f name=$DOCKER_NAME | wc -l)
     if [[ $seedcount -eq 2 ]]; then
@@ -196,6 +256,8 @@ seed_running() {
     fi
 }
 
+# Usage: ./run.sh start
+# Creates and/or starts the Steem docker container
 start() {
     echo $GREEN"Starting container..."$RESET
     seed_exists
@@ -206,6 +268,11 @@ start() {
     fi
 }
 
+# Usage: ./run.sh replay
+# Replays the blockchain for the Steem docker container
+# If steem is already running, it will ask you if you still want to replay
+# so that it can stop and remove the old container
+#
 replay() {
     seed_running
     if [[ $? == 0 ]]; then
@@ -228,14 +295,28 @@ replay() {
     echo "Started."
 }
 
+# Usage: ./run.sh shm_size size
+# Resizes the ramdisk used for storing Steem's shared_memory at /dev/shm
+# Size should be specified with G (gigabytes), e.g. ./run.sh shm_size 64G
+#
 shm_size() {
     if (( $# != 1 )); then
-	echo $RED"Please specify a size, such as ./run.sh shm_size 64G"
+        echo $RED"Please specify a size, such as ./run.sh shm_size 64G"
     fi
-    echo "Setting SHM to $1"
-    mount -o remount,size=$1 /dev/shm
+    echo "Setting /dev/shm to $1"
+    sudo mount -o remount,size=$1 /dev/shm
+    if [[ $? -eq 0 ]]; then
+        echo "${GREEN}Successfully resized /dev/shm${RESET}"
+    else
+        echo "${RED}An error occurred while resizing /dev/shm...${RESET}"
+        echo "Make sure to specify size correctly, e.g. 64G. You can also try using sudo to run this."
+    fi
 }
 
+# Usage: ./run.sh stop
+# Stops the Steem container, and removes the container to avoid any leftover
+# configuration, e.g. replay command line options
+#
 stop() {
     echo $RED"Stopping container..."$RESET
     docker stop $DOCKER_NAME
@@ -243,28 +324,50 @@ stop() {
     docker rm $DOCKER_NAME
 }
 
+# Usage: ./run.sh enter
+# Enters the running docker container and opens a bash shell for debugging
+#
 enter() {
     docker exec -it $DOCKER_NAME bash
 }
 
+# Usage: ./run.sh shell
 # Runs the container similar to `run` with mounted directories, 
 # then opens a BASH shell for debugging
+# To avoid leftover containers, it uses `--rm` to remove the container once you exit.
+#
 shell() {
     docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem --rm -it steem bash
 }
 
 
+# Usage: ./run.sh wallet
+# Opens cli_wallet inside of the running Steem container and
+# connects to the local steemd over websockets on port 8090
+#
 wallet() {
     docker exec -it $DOCKER_NAME cli_wallet -s ws://127.0.0.1:8090
 }
 
+# Usage: ./run.sh remote_wallet [wss_server]
+# Connects to a remote websocket server for wallet connection. This is completely safe
+# as your wallet/private keys are never sent to the remote server.
+#
+# By default, it will connect to wss://steemd.privex.io:443 (ws = normal websockets, wss = secure HTTPS websockets)
+# See this link for a list of WSS nodes: https://www.steem.center/index.php?title=Public_Websocket_Servers
+# 
+#    wss_server - a custom websocket server to connect to, e.g. ./run.sh remote_wallet wss://rpc.steemviz.com
+#
 remote_wallet() {
     if (( $# == 1 )); then
-	REMOTE_WS=$1
+        REMOTE_WS=$1
     fi
     docker run -v "$DATADIR":/steem --rm -it steem cli_wallet -s "$REMOTE_WS"
 }
 
+# Usage: ./run.sh logs
+# Shows the last 30 log lines of the running steem container, and follows the log until you press ctrl-c
+#
 logs() {
     echo $BLUE"DOCKER LOGS: (press ctrl-c to exit) "$RESET
     docker logs -f --tail=30 $DOCKER_NAME
@@ -272,6 +375,12 @@ logs() {
     #tail -n 30 $DATADIR/{info.log,debug.log}
 }
 
+# Usage: ./run.sh pclogs
+# (warning: may require root to work properly in some cases)
+# Used to watch % replayed during blockchain replaying.
+# Scans and follows a large portion of your steem logs then filters to only include the replay percentage
+#   example:    2018-12-08T23:47:16    22.2312%   6300000 of 28338603   (60052M free)
+#
 pclogs() {
     if [[ ! $(command -v jq) ]]; then
         echo $RED"jq not found. Attempting to install..."$RESET
@@ -311,6 +420,15 @@ pclogs() {
     done
 }
 
+# Usage: ./run.sh tslogs
+# (warning: may require root to work properly in some cases)
+# Shows the Steem logs, but with UTC timestamps extracted from the docker logs.
+# Scans and follows a large portion of your steem logs, filters out useless data, and appends a 
+# human readable timestamp on the left. Time is normally in UTC, not your local. Example:
+#
+#   2018-12-09T01:04:59 p2p_plugin.cpp:212            handle_block         ] Got 21 transactions 
+#                   on block 28398481 by someguy123 -- Block Time Offset: -345 ms
+#
 tslogs() {
     if [[ ! $(command -v jq) ]]; then
         echo $RED"jq not found. Attempting to install..."$RESET
@@ -346,6 +464,8 @@ tslogs() {
     done
 }
 
+# Internal use only
+# Used by `ver` to pretty print new commits on origin/master
 simplecommitlog() {
     local commit_format;
     local args;
@@ -367,6 +487,11 @@ simplecommitlog() {
     git log --pretty=format:"$commit_format" $args
 }
 
+
+# Usage: ./run.sh ver
+# Displays information about your Steem-in-a-box version, including the docker container
+# as well as the scripts such as run.sh. Checks for updates using git and DockerHub API.
+#
 ver() {
     LINE="==========================="
     ####
@@ -490,6 +615,8 @@ ver() {
 
 }
 
+# Usage: ./run.sh start
+# Very simple status display, letting you know if the container exists, and if it's running.
 status() {
     
     if seed_exists; then
@@ -586,7 +713,7 @@ case $1 in
     tslogs)
         tslogs
         ;;
-    ver)
+    ver|version)
         ver
         ;;
     *)
