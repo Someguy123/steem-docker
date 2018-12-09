@@ -314,6 +314,13 @@ dl-blocks-rsync() {
     # I = ignore timestamps and size, vv = be more verbose, h = human readable
     # append-verify = attempt to append to the file, but make sure to verify the existing pieces match the server
     rsync -Ivvh --append-verify --progress "$url" "${BC_FOLDER}/block_log"
+    ret=$?
+    if (($ret==0)); then
+        echo "FINISHED. Blockchain downloaded via rsync (make sure to check for any errors above)"
+    else
+        echo "${RED}An error occurred while downloading via rsync... please check above for errors${RESET}"
+    fi
+    return $ret
 }
 
 # Internal use
@@ -332,8 +339,8 @@ dl-blocks-http() {
         fi
     fi
     echo -e "\n==============================================================="
-    echo -e "${BOLD}Downloading via:${RESET}\t${bc_lz4_http}"
-    echo -e "${BOLD}Writing to:${RESET}\t\t${bc_folder}/block_log"
+    echo -e "${BOLD}Downloading via:${RESET}\t${url}"
+    echo -e "${BOLD}Writing to:${RESET}\t\t${BC_FOLDER}/block_log"
     [[ "$compression" != "no" ]] && \
         echo -e "${BOLD}Compression:${RESET}\t\t$compression"
     echo -e "===============================================================\n"
@@ -355,7 +362,13 @@ dl-blocks-http() {
             wget -c "$url" -O "$BC_FOLDER/block_log"
             ;;
     esac
-    echo "FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
+    ret=$?
+    if (($ret==0)); then
+        echo "FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
+    else
+        echo "${RED}An error occurred while downloading... please check above for errors${RESET}"
+    fi
+    return $ret
 }
 
 # Usage: ./run.sh install_docker
