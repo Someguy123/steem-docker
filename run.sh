@@ -331,8 +331,11 @@ dl-blocks-http() {
         echo -e "${BOLD}Compression:${RESET}\t\t$compression"
     echo -e "===============================================================\n"
 
-    [ [[ "$compression" != "no" ]] && echo "${GREEN}${BOLD}Downloading and de-compressing block log on-the-fly...${RESET}" ] || \
+    if [[ "$compression" != "no" ]]; then 
+        echo "${GREEN}${BOLD}Downloading and de-compressing block log on-the-fly...${RESET}"
+    else
         echo "${GREEN}${BOLD}Downloading raw block log...${RESET}"
+    fi
 
     case "$compression" in 
         lz4)
