@@ -79,7 +79,8 @@ help() {
     echo "    logs - show all logs inc. docker logs, and steem logs"
     echo "    wallet - open cli_wallet in the container"
     echo "    remote_wallet - open cli_wallet in the container connecting to a remote seed"
-    echo "    enter - enter a bash session in the container"
+    echo "    enter - enter a bash session in the currently running container"
+    echo "    shell - launch the steem container with appropriate mounts, then open bash for inspection"
     echo
     exit
 }
@@ -245,6 +246,13 @@ stop() {
 enter() {
     docker exec -it $DOCKER_NAME bash
 }
+
+# Runs the container similar to `run` with mounted directories, 
+# then opens a BASH shell for debugging
+shell() {
+    docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem --rm -it steem bash
+}
+
 
 wallet() {
     docker exec -it $DOCKER_NAME cli_wallet -s ws://127.0.0.1:8090
@@ -565,6 +573,9 @@ case $1 in
         ;;
     enter)
         enter
+        ;;
+    shell)
+        shell
         ;;
     logs)
         logs
