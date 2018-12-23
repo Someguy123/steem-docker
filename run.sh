@@ -10,6 +10,9 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DATADIR="$DIR/data"}
 : ${DOCKER_NAME="seed"}
 
+# the tag to use when running/replaying steemd
+: ${DOCKER_IMAGE="steem"}
+
 
 # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
 : ${BC_HTTP="http://files.privex.io/steem/block_log.lz4"}
@@ -159,7 +162,7 @@ build() {
     fi
     echo $GREEN"Building docker container"$RESET
     cd $DOCKER_DIR
-    docker build -t steem .
+    docker build -t "$DOCKER_IMAGE" .
 }
 
 # Build full memory node (for RPC nodes) as a docker image
@@ -190,7 +193,7 @@ build_full() {
     fi
     echo $GREEN"Building full-node docker container"$RESET
     cd $FULL_DOCKER_DIR
-    docker build -t steem .
+    docker build -t "$DOCKER_IMAGE" .
 }
 
 # Usage: ./run.sh dlblocks [override_dlmethod] [url] [compress]
@@ -456,7 +459,7 @@ start() {
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
     else
-        docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir
+        docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir
     fi
 }
 
@@ -483,7 +486,7 @@ replay() {
     echo "Removing old container"
     docker rm $DOCKER_NAME
     echo "Running steem with replay..."
-    docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t steem steemd --data-dir=/steem/witness_node_data_dir --replay
+    docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir --replay
     echo "Started."
 }
 
@@ -529,7 +532,7 @@ enter() {
 # To avoid leftover containers, it uses `--rm` to remove the container once you exit.
 #
 shell() {
-    docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem --rm -it steem bash
+    docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem --rm -it "$DOCKER_IMAGE" bash
 }
 
 
@@ -554,7 +557,7 @@ remote_wallet() {
     if (( $# == 1 )); then
         REMOTE_WS=$1
     fi
-    docker run -v "$DATADIR":/steem --rm -it steem cli_wallet -s "$REMOTE_WS"
+    docker run -v "$DATADIR":/steem --rm -it "$DOCKER_IMAGE" cli_wallet -s "$REMOTE_WS"
 }
 
 # Usage: ./run.sh logs
