@@ -50,6 +50,9 @@ fi
 # blockchain folder, used by dlblocks
 : ${BC_FOLDER="$DATADIR/witness_node_data_dir/blockchain"}
 
+: ${EXAMPLE_MIRA="$DATADIR/database.cfg.example"}
+: ${MIRA_FILE="$DATADIR/database.cfg"}
+
 : ${EXAMPLE_CONF="$DATADIR/witness_node_data_dir/config.ini.example"}
 : ${CONF_FILE="$DATADIR/witness_node_data_dir/config.ini"}
 
@@ -57,7 +60,7 @@ fi
 if [[ ! -f "$CONF_FILE" ]]; then
     if [[ -f "$EXAMPLE_CONF" ]]; then
         echo "${YELLOW}File config.ini not found. copying example (seed)${RESET}"
-        cp -v "$DATADIR/witness_node_data_dir/config.ini.example" "$DATADIR/witness_node_data_dir/config.ini" 
+        cp -vi "$EXAMPLE_CONF" "$CONF_FILE" 
         echo "${GREEN} > Successfully installed example config for seed node.${RESET}"
         echo " > You may want to adjust this if you're running a witness, e.g. disable p2p-endpoint"
     else
@@ -65,6 +68,22 @@ if [[ ! -f "$CONF_FILE" ]]; then
         echo "${YELLOW}${BOLD}You may want to check these files exist, or you won't be able to launch Steem${RESET}"
         echo "Example Config: $EXAMPLE_CONF"
         echo "Main Config: $CONF_FILE"
+    fi
+fi
+
+if [[ ! -f "$MIRA_FILE" ]]; then
+    if [[ -f "$EXAMPLE_MIRA" ]]; then
+        echo "${YELLOW}File data/database.cfg not found. copying example ${RESET}"
+        cp -vi "$EXAMPLE_MIRA" "$MIRA_FILE" 
+        echo "${GREEN} > Successfully installed example MIRA config.${RESET}"
+        echo " > You may want to adjust this depending on your resources and type of node:"
+        echo " - - > https://github.com/steemit/steem/blob/master/doc/mira.md"
+
+    else
+        echo "${YELLOW}WARNING: You don't seem to have a MIRA config file (data/database.cfg) and the example config couldn't be found...${RESET}"
+        echo "${YELLOW}${BOLD}You may want to check these files exist, or you won't be able to use Steem with MIRA${RESET}"
+        echo "Example Config: $EXAMPLE_MIRA"
+        echo "Main Config: $MIRA_FILE"
     fi
 fi
 

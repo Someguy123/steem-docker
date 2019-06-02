@@ -1,4 +1,5 @@
 data/witness_node_data_dir/config.ini*
+data/database.cfg
 .vscode
 .idea
 .DS_Store
