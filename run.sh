@@ -50,8 +50,8 @@ fi
 # blockchain folder, used by dlblocks
 : ${BC_FOLDER="$DATADIR/witness_node_data_dir/blockchain"}
 
-: ${EXAMPLE_MIRA="$DATADIR/database.cfg.example"}
-: ${MIRA_FILE="$DATADIR/database.cfg"}
+: ${EXAMPLE_MIRA="$DATADIR/witness_node_data_dir/database.cfg.example"}
+: ${MIRA_FILE="$DATADIR/witness_node_data_dir/database.cfg"}
 
 : ${EXAMPLE_CONF="$DATADIR/witness_node_data_dir/config.ini.example"}
 : ${CONF_FILE="$DATADIR/witness_node_data_dir/config.ini"}
@@ -73,7 +73,7 @@ fi
 
 if [[ ! -f "$MIRA_FILE" ]]; then
     if [[ -f "$EXAMPLE_MIRA" ]]; then
-        echo "${YELLOW}File data/database.cfg not found. copying example ${RESET}"
+        echo "${YELLOW}File database.cfg not found. copying example ${RESET}"
         cp -vi "$EXAMPLE_MIRA" "$MIRA_FILE" 
         echo "${GREEN} > Successfully installed example MIRA config.${RESET}"
         echo " > You may want to adjust this depending on your resources and type of node:"
