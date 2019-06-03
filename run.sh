@@ -615,9 +615,9 @@ pclogs() {
     while true
     do
         if read -r line <$pipe; then
-            # first grep the data for "M free" to avoid
+            # first grep the data for "objects cached" to avoid
             # needlessly processing the data
-            L=$(grep --colour=never "M free" <<< "$line")
+            L=$(grep --colour=never "objects cached" <<< "$line")
             if [[ $? -ne 0 ]]; then
                 continue
             fi
