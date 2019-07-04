@@ -105,6 +105,7 @@ help() {
     start - starts steem container
     dlblocks - download and decompress the blockchain to speed up your first start
     replay - starts steem container (in replay mode)
+    memory_replay - starts steem container (in replay mode, with --memory-replay)
     shm_size - resizes /dev/shm to size given, e.g. ./run.sh shm_size 10G 
     stop - stops steem container
     status - show status of steem container
@@ -509,6 +510,29 @@ replay() {
     echo "Started."
 }
 
+# For MIRA, replay with --memory-replay
+memory_replay() {
+    seed_running
+    if [[ $? == 0 ]]; then
+        echo $RED"WARNING: Your Steem server ($DOCKER_NAME) is currently running"$RESET
+	echo
+        docker ps
+	echo
+	read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
+        if [[ "$shouldstop" == "y" ]]; then
+		stop
+	else
+		echo $GREEN"Did not say 'y'. Quitting."$RESET
+		return
+	fi
+    fi 
+    echo "Removing old container"
+    docker rm $DOCKER_NAME
+    echo "Running steem with --memory-replay..."
+    docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir --replay --memory-replay
+    echo "Started."
+}
+
 # Usage: ./run.sh shm_size size
 # Resizes the ramdisk used for storing Steem's shared_memory at /dev/shm
 # Size should be specified with G (gigabytes), e.g. ./run.sh shm_size 64G
@@ -878,6 +902,9 @@ case $1 in
         ;;
     replay)
         replay
+        ;;
+    memory_replay)
+        memory_replay
         ;;
     shm_size)
         shm_size $2
