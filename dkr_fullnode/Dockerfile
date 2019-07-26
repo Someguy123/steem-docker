@@ -11,26 +11,28 @@ RUN apt-get update && \
     apt-get clean -qy && \
     pip3 install jinja2
 
-ARG steemd_version=stable
+ARG steemd_version=20190710-testnet
 
 ARG STEEM_STATIC_BUILD=ON
 ENV STEEM_STATIC_BUILD ${STEEM_STATIC_BUILD}
-
-ARG ENABLE_MIRA=ON
-ENV ENABLE_MIRA ${ENABLE_MIRA}
 
 RUN cd ~ && \
 	git clone https://github.com/steemit/steem.git && \
 	cd steem && \
 	git checkout ${steemd_version} && \
 	git submodule update --init --recursive && \
-        cd ~/steem && \
-	cmake -DCMAKE_BUILD_TYPE=Release . \
-            -DCLEAR_VOTES=OFF \
-            -DLOW_MEMORY_NODE=OFF \
-            -DSTEEM_STATIC_BUILD=${STEEM_STATIC_BUILD} \
-            -DSKIP_BY_TX_ID=OFF \
-            -DENABLE_MIRA=${ENABLE_MIRA} && \
+    cd ~/steem && \
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_STEEM_TESTNET=ON \
+        -DENABLE_SMT_SUPPORT=ON \
+        -DLOW_MEMORY_NODE=OFF \
+        -DCHAINBASE_CHECK_LOCKING=ON \
+        -DSTEEM_STATIC_BUILD=${STEEM_STATIC_BUILD} \
+        -DCLEAR_VOTES=OFF \
+        -DSKIP_BY_TX_ID=OFF \
+        -DSTEEM_LINT_LEVEL=OFF \
+        . && \
 	make -j$(nproc) && make install && rm -rf ~/steem
 VOLUME /steem
 WORKDIR /steem

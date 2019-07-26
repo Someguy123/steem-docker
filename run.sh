@@ -35,8 +35,8 @@ MAGENTA="$(tput setaf 5)"
 CYAN="$(tput setaf 6)"
 WHITE="$(tput setaf 7)"
 RESET="$(tput sgr0)"
-: ${DK_TAG="someguy123/steem:latest"}
-: ${DK_TAG_FULL="someguy123/steem:latest-full"}
+: ${DK_TAG="someguy123/steem:testnet-hf21"}
+: ${DK_TAG_FULL="someguy123/steem:testnet-hf21"}
 : ${SHM_DIR="/dev/shm"}
 : ${REMOTE_WS="wss://steemd.privex.io"}
 # Amount of time in seconds to allow the docker container to stop before killing it.
@@ -44,7 +44,7 @@ RESET="$(tput sgr0)"
 : ${STOP_TIME=600}
 
 # default. override in .env
-: ${PORTS="2001"}
+: ${PORTS="2201"}
 
 # easy coloured messages function
 # written by @someguy123
