@@ -52,7 +52,7 @@ function msg () {
     # usage: msg [color] message
     if [[ "$#" -eq 0 ]]; then echo ""; return; fi;
     if [[ "$#" -eq 1 ]]; then
-        echo "$1"
+        echo -e "$1"
         return
     fi
     if [[ "$#" -gt 2 ]] && [[ "$1" == "bold" ]]; then
@@ -61,12 +61,12 @@ function msg () {
     fi
     _msg="[$(date +'%Y-%m-%d %H:%M:%S %Z')] ${@:2}"
     case "$1" in
-        bold) echo "${BOLD}${_msg}${RESET}";;
-        [Bb]*) echo "${BLUE}${_msg}${RESET}";;
-        [Yy]*) echo "${YELLOW}${_msg}${RESET}";;
-        [Rr]*) echo "${RED}${_msg}${RESET}";;
-        [Gg]*) echo "${GREEN}${_msg}${RESET}";;
-        * ) echo "${_msg}";;
+        bold) echo -e "${BOLD}${_msg}${RESET}";;
+        [Bb]*) echo -e "${BLUE}${_msg}${RESET}";;
+        [Yy]*) echo -e "${YELLOW}${_msg}${RESET}";;
+        [Rr]*) echo -e "${RED}${_msg}${RESET}";;
+        [Gg]*) echo -e "${GREEN}${_msg}${RESET}";;
+        * ) echo -e "${_msg}";;
     esac
 }
 
@@ -261,33 +261,30 @@ dlblocks() {
     pkg_not_found xz xz-utils
     
     [[ ! -d "$BC_FOLDER" ]] && mkdir -p "$BC_FOLDER"
-    [[ -f "$BC_FOLDER/block_log.index" ]] && echo "Removing old block index" && sudo rm -vf "$BC_FOLDER/block_log.index" 2> /dev/null
+    [[ -f "$BC_FOLDER/block_log.index" ]] && msg "Removing old block index" && sudo rm -vf "$BC_FOLDER/block_log.index" 2> /dev/null
 
     if (( $# > 0 )); then
         custom-dlblocks "$@"
         return $?
     fi
     if [[ -f "$BC_FOLDER/block_log" ]]; then
-        echo "${YELLOW}It looks like block_log already exists${RESET}"
+        msg yellow "It looks like block_log already exists"
         if [[ "$BC_RSYNC" == "no" ]]; then
-            echo "${RED}As BC_RSYNC is set to 'no', we're just going to try to retry the http download${RESET}"
-            echo "If your HTTP source is uncompressed, we'll try to resume it"
+            msg red "As BC_RSYNC is set to 'no', we're just going to try to retry the http download"
+            msg "If your HTTP source is uncompressed, we'll try to resume it"
             dl-blocks-http "$BC_HTTP" "$BC_HTTP_CMP"
             return
         else
-            echo "${GREEN}We'll now use rsync to attempt to repair any corruption, or missing pieces from your block_log.${RESET}"
+            msg green "We'll now use rsync to attempt to repair any corruption, or missing pieces from your block_log."
             dl-blocks-rsync "$BC_RSYNC"
             return
         fi
     fi
-    echo "No existing block_log found. Will use standard http to download, and will also 
-decompress lz4 while downloading, to save time."
-    echo "If you encounter an error while downloading the block_log, just run dlblocks again, 
-and it will use rsync to resume and repair it"
+    msg "No existing block_log found. Will use standard http to download, and will\n also decompress lz4 while downloading, to save time."
+    msg "If you encounter an error while downloading the block_log, just run dlblocks again,\n and it will use rsync to resume and repair it"
     dl-blocks-http "$BC_HTTP" "$BC_HTTP_CMP" 
-    echo "FINISHED. Blockchain installed to ${BC_FOLDER}/block_log (make sure to check for any errors above)"
-    echo "${RED}If you encountered an error while downloading the block_log, just run dlblocks again
-    and it will use rsync to resume and repair it${RESET}"
+    msg "FINISHED. Blockchain installed to ${BC_FOLDER}/block_log (make sure to check for any errors above)"
+    msg red "If you encountered an error while downloading the block_log, just run dlblocks again\n and it will use rsync to resume and repair it"
     echo "Remember to resize your /dev/shm, and run with replay!"
     echo "$ ./run.sh shm_size SIZE (e.g. 8G)"
     echo "$ ./run.sh replay"
@@ -312,7 +309,7 @@ custom-dlblocks() {
             return $?
             ;;
         rsync-replace)
-            echo "Removing old block_log..."
+            msg yellow " -> Removing old block_log..."
             sudo rm -vf "$BC_FOLDER/block_log"
             dl-blocks-rsync "$url"
             return $?
@@ -322,14 +319,14 @@ custom-dlblocks() {
             return $? 
             ;;
         http-replace)
-            echo "Removing old block_log..."
+            msg yellow " -> Removing old block_log..."
             sudo rm -vf "$BC_FOLDER/block_log"
             dl-blocks-http "$url" "$compress"
             return $?
             ;;
         *)
-            echo "Invalid download method"
-            echo "Valid options are http, http-replace, rsync, or rsync-replace"
+            msg red "Invalid download method"
+            msg red "Valid options are http, http-replace, rsync, or rsync-replace"
             return 1
             ;;
     esac 
@@ -339,8 +336,8 @@ custom-dlblocks() {
 # Usage: dl-blocks-rsync blocklog_url
 dl-blocks-rsync() {
     local url="$1"
-    echo "This may take a while, and may at times appear to be stalled. ${YELLOW}${BOLD}Be patient, it takes time (3 to 10 mins) to scan the differences.${RESET}"
-    echo "Once it detects the differences, it will download at very high speed depending on how much of your block_log is intact."
+    msg "This may take a while, and may at times appear to be stalled. ${YELLOW}${BOLD}Be patient, it takes time (3 to 10 mins) to scan the differences."
+    msg "Once it detects the differences, it will download at very high speed depending on how much of your block_log is intact."
     echo -e "\n==============================================================="
     echo -e "${BOLD}Downloading via:${RESET}\t${url}"
     echo -e "${BOLD}Writing to:${RESET}\t\t${BC_FOLDER}/block_log"
@@ -350,9 +347,9 @@ dl-blocks-rsync() {
     rsync -Ivvh --append-verify --progress "$url" "${BC_FOLDER}/block_log"
     ret=$?
     if (($ret==0)); then
-        echo "FINISHED. Blockchain downloaded via rsync (make sure to check for any errors above)"
+        msg bold green " (+) FINISHED. Blockchain downloaded via rsync (make sure to check for any errors above)"
     else
-        echo "${RED}An error occurred while downloading via rsync... please check above for errors${RESET}"
+        msg bold red "An error occurred while downloading via rsync... please check above for errors"
     fi
     return $ret
 }
@@ -362,7 +359,7 @@ dl-blocks-rsync() {
 dl-blocks-http() {
     local url="$1"
     local compression="no"
-    (( $# < 1 )) && echo "ERROR: no url specified for dl-blocks-http"
+    (( $# < 1 )) && msg bold red "ERROR: no url specified for dl-blocks-http" && return 1
     if (( $# == 2 )); then
         compression="$2"
         if [[ "$2" != "lz4" && "$2" != "xz" && "$2" != "no" ]]; then
@@ -380,9 +377,9 @@ dl-blocks-http() {
     echo -e "===============================================================\n"
 
     if [[ "$compression" != "no" ]]; then 
-        echo "${GREEN}${BOLD}Downloading and de-compressing block log on-the-fly...${RESET}"
+        msg bold green " -> Downloading and de-compressing block log on-the-fly..."
     else
-        echo "${GREEN}${BOLD}Downloading raw block log...${RESET}"
+        msg bold green " -> Downloading raw block log..."
     fi
 
     case "$compression" in 
@@ -398,9 +395,9 @@ dl-blocks-http() {
     esac
     ret=$?
     if (($ret==0)); then
-        echo "FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
+        msg bold green " (+) FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
     else
-        echo "${RED}An error occurred while downloading... please check above for errors${RESET}"
+        msg bold red "An error occurred while downloading... please check above for errors"
     fi
     return $ret
 }
@@ -485,7 +482,7 @@ seed_running() {
 # Usage: ./run.sh start
 # Creates and/or starts the Steem docker container
 start() {
-    msg bold green "Starting container..."
+    msg bold green " -> Starting container '${DOCKER_NAME}'..."
     seed_exists
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
@@ -527,15 +524,15 @@ replay() {
 #
 shm_size() {
     if (( $# != 1 )); then
-        echo $RED"Please specify a size, such as ./run.sh shm_size 64G"
+        msg red "Please specify a size, such as ./run.sh shm_size 64G"
     fi
-    echo "Setting /dev/shm to $1"
+    msg green " -> Setting /dev/shm to $1"
     sudo mount -o remount,size=$1 /dev/shm
     if [[ $? -eq 0 ]]; then
-        echo "${GREEN}Successfully resized /dev/shm${RESET}"
+        msg bold green "Successfully resized /dev/shm"
     else
-        echo "${RED}An error occurred while resizing /dev/shm...${RESET}"
-        echo "Make sure to specify size correctly, e.g. 64G. You can also try using sudo to run this."
+        msg bold red "An error occurred while resizing /dev/shm..."
+        msg red "Make sure to specify size correctly, e.g. 64G. You can also try using sudo to run this."
     fi
 }
 
@@ -603,7 +600,7 @@ remote_wallet() {
 # Shows the last 30 log lines of the running steem container, and follows the log until you press ctrl-c
 #
 logs() {
-    echo $BLUE"DOCKER LOGS: (press ctrl-c to exit) "$RESET
+    msg blue "DOCKER LOGS: (press ctrl-c to exit) "
     docker logs -f --tail=30 $DOCKER_NAME
     #echo $RED"INFO AND DEBUG LOGS: "$RESET
     #tail -n 30 $DATADIR/{info.log,debug.log}
@@ -665,7 +662,7 @@ pclogs() {
 #
 tslogs() {
     if [[ ! $(command -v jq) ]]; then
-        echo $RED"jq not found. Attempting to install..."$RESET
+        msg red "jq not found. Attempting to install..."
         sleep 3
         sudo apt update
         sudo apt install -y jq
@@ -877,11 +874,11 @@ fi
 
 case $1 in
     build)
-        echo "You may want to use '$0 install' for a binary image instead, it's faster."
+        msg bold yellow "You may want to use '$0 install' for a binary image instead, it's faster."
         build "${@:2}"
         ;;
     build_full)
-        echo "You may want to use '$0 install_full' for a binary image instead, it's faster."
+        msg bold yellow "You may want to use '$0 install_full' for a binary image instead, it's faster."
         build_full "${@:2}"
         ;;
     install_docker)
@@ -920,7 +917,7 @@ case $1 in
         start
         ;;
     optimize)
-        echo "Applying recommended dirty write settings..."
+        msg "Applying recommended dirty write settings..."
         optimize
         ;;
     status)
@@ -954,7 +951,7 @@ case $1 in
         ver
         ;;
     *)
-        echo "Invalid cmd"
+        msg bold red "Invalid cmd"
         help
         ;;
 esac
