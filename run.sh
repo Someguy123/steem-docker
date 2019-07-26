@@ -43,6 +43,33 @@ RESET="$(tput sgr0)"
 # default. override in .env
 : ${PORTS="2001"}
 
+# easy coloured messages function
+# written by @someguy123
+function msg () {
+    # usage: msg [color] message
+    if [[ "$#" -eq 0 ]]; then echo ""; return; fi;
+    if [[ "$#" -eq 1 ]]; then
+        echo "$1"
+        return
+    fi
+    if [[ "$#" -gt 2 ]] && [[ "$1" == "bold" ]]; then
+        echo -n "${BOLD}"
+        shift
+    fi
+    _msg="[$(date +'%Y-%m-%d %H:%M:%S %Z')] ${@:2}"
+    case "$1" in
+        bold) echo "${BOLD}${_msg}${RESET}";;
+        [Bb]*) echo "${BLUE}${_msg}${RESET}";;
+        [Yy]*) echo "${YELLOW}${_msg}${RESET}";;
+        [Rr]*) echo "${RED}${_msg}${RESET}";;
+        [Gg]*) echo "${GREEN}${_msg}${RESET}";;
+        * ) echo "${_msg}";;
+    esac
+}
+
+export -f msg
+export RED GREEN YELLOW BLUE BOLD NORMAL RESET
+
 if [[ -f .env ]]; then
     source .env
 fi
@@ -403,12 +430,13 @@ install() {
     if (( $# == 1 )); then
         DK_TAG=$1
     fi
-    echo $BLUE"NOTE: You are installing image $DK_TAG. Please make sure this is correct."$RESET
+    msg bold red "NOTE: You are installing image $DK_TAG. Please make sure this is correct."
     sleep 2
-    docker pull $DK_TAG 
-    echo "Tagging as steem"
-    docker tag $DK_TAG steem
-    echo "Installation completed. You may now configure or run the server"
+    msg yellow " -> Loading image from ${DK_TAG}"
+    docker pull "$DK_TAG"
+    msg green " -> Tagging as steem"
+    docker tag "$DK_TAG" steem
+    msg bold green " -> Installation completed. You may now configure or run the server"
 }
 
 # Usage: ./run.sh install_full
@@ -416,11 +444,11 @@ install() {
 # Default tag is normally someguy123/steem:latest-full (official builds by the creator of steem-docker).
 #
 install_full() {
-    echo "Loading image from someguy123/steem"
-    docker pull $DK_TAG_FULL 
-    echo "Tagging as steem"
-    docker tag $DK_TAG_FULL steem
-    echo "Installation completed. You may now configure or run the server"
+    msg yellow " -> Loading image from ${DK_TAG_FULL}"
+    docker pull "$DK_TAG_FULL" 
+    msg green " -> Tagging as steem"
+    docker tag "$DK_TAG_FULL" steem
+    msg bold green " -> Installation completed. You may now configure or run the server"
 }
 
 # Internal Use Only
@@ -454,7 +482,7 @@ seed_running() {
 # Usage: ./run.sh start
 # Creates and/or starts the Steem docker container
 start() {
-    echo $GREEN"Starting container..."$RESET
+    msg bold green "Starting container..."
     seed_exists
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
@@ -472,22 +500,22 @@ replay() {
     seed_running
     if [[ $? == 0 ]]; then
         echo $RED"WARNING: Your Steem server ($DOCKER_NAME) is currently running"$RESET
-	echo
+        echo
         docker ps
-	echo
-	read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
+        echo
+        read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
         if [[ "$shouldstop" == "y" ]]; then
-		stop
-	else
-		echo $GREEN"Did not say 'y'. Quitting."$RESET
-		return
-	fi
+            stop
+        else
+            echo $GREEN"Did not say 'y'. Quitting."$RESET
+            return
+        fi
     fi 
-    echo "Removing old container"
+    msg yellow " -> Removing old container '${DOCKER_NAME}'"
     docker rm $DOCKER_NAME
-    echo "Running steem with replay..."
+    msg green " -> Running steem (image: ${DOCKER_IMAGE}) with replay in container '${DOCKER_NAME}'..."
     docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir --replay
-    echo "Started."
+    msg bold green " -> Started."
 }
 
 # Usage: ./run.sh shm_size size
@@ -513,10 +541,18 @@ shm_size() {
 # configuration, e.g. replay command line options
 #
 stop() {
-    echo $RED"Stopping container..."$RESET
-    docker stop $DOCKER_NAME
-    echo $RED"Removing old container..."$RESET
+    msg "If you don't care about a clean stop, you can force stop the container with ${BOLD}./run.sh kill"
+    msg red "Stopping container '${DOCKER_NAME}' (this may take up to 120 seconds)..."
+    docker stop -t 120 $DOCKER_NAME
+    msg red "Removing old container '${DOCKER_NAME}'..."
     docker rm $DOCKER_NAME
+}
+
+sbkill() {
+    msg bold red "Killing container '${DOCKER_NAME}'..."
+    docker kill "$DOCKER_NAME"
+    msg red "Removing container ${DOCKER_NAME}"
+    docker rm "$DOCKER_NAME"
 }
 
 # Usage: ./run.sh enter
@@ -578,10 +614,10 @@ logs() {
 #
 pclogs() {
     if [[ ! $(command -v jq) ]]; then
-        echo $RED"jq not found. Attempting to install..."$RESET
+        msg red "jq not found. Attempting to install..."
         sleep 3
-        sudo apt update
-        sudo apt install -y jq
+        sudo apt-get update -y > /dev/null
+        sudo apt-get install -y jq > /dev/null
     fi
     local LOG_PATH=$(docker inspect $DOCKER_NAME | jq -r .[0].LogPath)
     local pipe=/tmp/dkpipepc.fifo
@@ -865,6 +901,9 @@ case $1 in
         ;;
     stop)
         stop
+        ;;
+    kill)
+        sbkill
         ;;
     restart)
         stop
