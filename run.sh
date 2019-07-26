@@ -8,7 +8,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DOCKER_DIR="$DIR/dkr"}
 : ${FULL_DOCKER_DIR="$DIR/dkr_fullnode"}
 : ${DATADIR="$DIR/data"}
-: ${DOCKER_NAME="seed"}
+: ${DOCKER_NAME="testnet"}
 
 # the tag to use when running/replaying steemd
 : ${DOCKER_IMAGE="steem"}
