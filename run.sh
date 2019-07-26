@@ -39,6 +39,9 @@ RESET="$(tput sgr0)"
 : ${DK_TAG_FULL="someguy123/steem:latest-full"}
 : ${SHM_DIR="/dev/shm"}
 : ${REMOTE_WS="wss://steemd.privex.io"}
+# Amount of time in seconds to allow the docker container to stop before killing it.
+# Default: 600 seconds (10 minutes)
+: ${STOP_TIME=600}
 
 # default. override in .env
 : ${PORTS="2001"}
@@ -542,8 +545,8 @@ shm_size() {
 #
 stop() {
     msg "If you don't care about a clean stop, you can force stop the container with ${BOLD}./run.sh kill"
-    msg red "Stopping container '${DOCKER_NAME}' (this may take up to 120 seconds)..."
-    docker stop -t 120 $DOCKER_NAME
+    msg red "Stopping container '${DOCKER_NAME}' (allowing up to ${STOP_TIME} seconds before killing)..."
+    docker stop -t ${STOP_TIME} $DOCKER_NAME
     msg red "Removing old container '${DOCKER_NAME}'..."
     docker rm $DOCKER_NAME
 }
