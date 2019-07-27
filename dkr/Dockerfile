@@ -12,7 +12,7 @@ RUN apt-get update && \
     apt-get clean -qy && \
     pip3 install jinja2
 
-ARG steemd_version=20190710-testnet
+ARG steemd_version=20190717-testnet
 
 ARG STEEM_STATIC_BUILD=ON
 ENV STEEM_STATIC_BUILD ${STEEM_STATIC_BUILD}

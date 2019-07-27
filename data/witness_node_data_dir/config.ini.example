@@ -23,6 +23,7 @@ flush = 100000
 
 # P2P nodes to connect to on startup (may specify multiple times)
 p2p-seed-node = steemseed-fin.privex.io:2201        # @privex (FI)
+p2p-seed-node = testnet.steemitdev.com:2001         # @steemit
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
 # checkpoint =
