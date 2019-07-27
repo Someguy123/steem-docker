@@ -620,7 +620,7 @@ shell() {
 # connects to the local steemd over websockets on port 8090
 #
 wallet() {
-    docker exec -it $DOCKER_NAME cli_wallet -s ws://127.0.0.1:8090
+    docker exec -it $DOCKER_NAME cli_wallet -s ws://127.0.0.1:8190
 }
 
 # Usage: ./run.sh remote_wallet [wss_server]
