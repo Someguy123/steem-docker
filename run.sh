@@ -11,7 +11,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DOCKER_NAME="testnet"}
 
 # the tag to use when running/replaying steemd
-: ${DOCKER_IMAGE="steem"}
+: ${DOCKER_IMAGE="testnet-hf21"}
 
 
 # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
@@ -454,8 +454,8 @@ install() {
     sleep 2
     msg yellow " -> Loading image from ${DK_TAG}"
     docker pull "$DK_TAG"
-    msg green " -> Tagging as steem"
-    docker tag "$DK_TAG" steem
+    msg green " -> Tagging as ${DOCKER_IMAGE}"
+    docker tag "$DK_TAG" "$DOCKER_IMAGE"
     msg bold green " -> Installation completed. You may now configure or run the server"
 }
 
@@ -466,8 +466,8 @@ install() {
 install_full() {
     msg yellow " -> Loading image from ${DK_TAG_FULL}"
     docker pull "$DK_TAG_FULL" 
-    msg green " -> Tagging as steem"
-    docker tag "$DK_TAG_FULL" steem
+    msg green " -> Tagging as ${DOCKER_IMAGE}"
+    docker tag "$DK_TAG_FULL" "$DOCKER_IMAGE"
     msg bold green " -> Installation completed. You may now configure or run the server"
 }
 
