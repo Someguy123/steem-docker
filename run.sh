@@ -150,6 +150,7 @@ help() {
     echo
     echo "Commands: 
     start - starts steem container
+    clean - Remove blockchain, p2p, and/or shared mem folder contents (warns beforehand)
     dlblocks - download and decompress the blockchain to speed up your first start
     replay - starts steem container (in replay mode)
     memory_replay - starts steem container (in replay mode, with --memory-replay)
@@ -975,6 +976,100 @@ status() {
 
 }
 
+# Usage: ./run.sh clean [blocks|shm|all]
+# Removes blockchain, p2p, and/or shared memory folder contents, with interactive prompts.
+#
+# To skip the "are you sure" prompt, specify either:
+#     'blocks' (clear blockchain+p2p)
+#     'shm' (SHM_DIR, usually /dev/shm)
+#     'all' (clear both of the above)
+#
+# Example (delete blockchain+p2p folder contents without asking first):
+#     ./run.sh clean blocks
+#
+sb_clean() {
+    bc_dir="${DATADIR}/witness_node_data_dir/blockchain"
+    p2p_dir="${DATADIR}/witness_node_data_dir/p2p"
+    
+    # To prevent the risk of glob problems due to non-existant folders,
+    # we re-create them silently before we touch them.
+    mkdir -p "$bc_dir" "$p2p_dir" "$SHM_DIR" &> /dev/null
+
+    msg yellow " :: Blockchain:           $bc_dir"
+    msg yellow " :: P2P files:            $p2p_dir"
+    msg yellow " :: Shared Mem / Rocksdb: $SHM_DIR"
+    msg
+    
+    if (( $# == 1 )); then
+        case $1 in
+            sh*)
+                msg bold red " !!! Clearing all files in SHM_DIR ( $SHM_DIR )"
+                rm -rfv "$SHM_DIR"/*
+                mkdir -p "$SHM_DIR" &> /dev/null
+                msg bold green " +++ Cleared shared files directory."
+                ;;
+            bloc*)
+                msg bold red " !!! Clearing all files in $bc_dir and $p2p_dir"
+                rm -rfv "$bc_dir"/*
+                rm -rfv "$p2p_dir"/*
+                mkdir -p "$bc_dir" "$p2p_dir" &> /dev/null
+                msg bold green " +++ Cleared blockchain files + p2p"
+                ;;
+            all)
+                msg bold red " !!! Clearing blockchain, p2p, and shared memory files..."
+                rm -rfv "$SHM_DIR"/*
+                rm -rfv "$bc_dir"/*
+                rm -rfv "$p2p_dir"/*
+                mkdir -p "$bc_dir" "$p2p_dir" "$SHM_DIR" &> /dev/null
+                msg bold green " +++ Cleared blockchain + p2p + shared memory"
+                ;;
+            *)
+                msg bold red " !!! Invalid option. Either run './run.sh clean' for interactive mode, "
+                msg bold red " !!!   or for automatic mode specify 'blocks' (blockchain + p2p), "
+                msg bold red " !!!   'shm' (shared memory/rocksdb) or 'all' (both blocks and shm)"
+                return 1
+                ;;
+        esac
+        return
+    fi
+
+    msg green " (+) To skip these prompts, you can run './run.sh clean' with 'blocks', 'shm', or 'all'"
+    msg green " (?) 'blocks' = blockchain + p2p folder, 'shm' = shared memory folder, 'all' = blocks + shm"
+    msg green " (?) Example: './run.sh clean blocks' will clear blockchain + p2p without any warnings."
+
+    read -p "Do you want to remove the blockchain files? (y/n) > " cleanblocks
+    if [[ "$cleanblocks" == "y" ]]; then
+        msg bold red " !!! Clearing blockchain files..."
+        rm -rvf "$bc_dir"/*
+        mkdir -p "$bc_dir" &> /dev/null
+        msg bold green " +++ Cleared blockchain files"
+    else
+        msg yellow " >> Not clearing blockchain folder."
+    fi
+    
+    read -p "Do you want to remove the p2p files? (y/n) > " cleanp2p
+    if [[ "$cleanp2p" == "y" ]]; then
+        msg bold red " !!! Clearing p2p files..."
+        rm -rvf "$p2p_dir"/*
+        mkdir -p "$p2p_dir" &> /dev/null
+        msg bold green " +++ Cleared p2p files"
+    else
+        msg yellow " >> Not clearing p2p folder."
+    fi
+    
+    read -p "Do you want to remove the shared memory / rocksdb files? (y/n) > " cleanshm
+    if [[ "$cleanshm" == "y" ]]; then
+        msg bold red " !!! Clearing shared memory files..."
+        rm -rvf "$SHM_DIR"/*
+        mkdir -p "$SHM_DIR" &> /dev/null
+        msg bold green " +++ Cleared shaed memory files"
+    else
+        msg yellow " >> Not clearing shared memory folder."
+    fi
+
+    msg bold green " ++ Done."
+}
+
 if [ "$#" -lt 1 ]; then
     help
 fi
@@ -1025,6 +1120,9 @@ case $1 in
         sleep 5
         build
         start
+        ;;
+    clean)
+        sb_clean "${@:2}"
         ;;
     optimize)
         msg "Applying recommended dirty write settings..."
