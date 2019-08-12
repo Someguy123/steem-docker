@@ -252,7 +252,9 @@ build() {
         cd "$DOCKER_DIR"
         msg bold green "$BUILD_MSG"
         docker build "${BUILD_ARGS[@]}" -t "$CUST_TAG" .
-        echo "${RED}
+        ret=$?
+        if (( $ret == 0 )); then
+            echo "${RED}
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
         For your safety, we've tagged this image as $CUST_TAG
@@ -263,7 +265,16 @@ build() {
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
         ${RESET}
-        "
+            "
+            msg bold green " +++ Successfully built steemd"
+            msg green " +++ Steem node type: ${BOLD}${fmm}"
+            msg green " +++ Version/Branch: ${BOLD}${BUILD_VER}"
+            msg green " +++ Build args: ${BOLD}${BUILD_ARGS[@]}"
+            msg green " +++ Docker tag: ${CUST_TAG}"
+        else
+            msg bold red " !!! ERROR: Something went wrong during the build process."
+            msg red " !!! Please scroll up and check for any error output during the build."
+        fi
         return
     fi
     msg bold green "$BUILD_MSG"
