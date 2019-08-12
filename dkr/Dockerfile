@@ -22,6 +22,7 @@ RUN pip3 install jinja2
 ###
 
 ARG steemd_version=stable
+ENV steemd_version ${steemd_version}
 
 ARG STEEM_STATIC_BUILD=ON
 ENV STEEM_STATIC_BUILD ${STEEM_STATIC_BUILD}
@@ -63,6 +64,13 @@ EXPOSE 8091
 
 ARG STEEMD_BIN="/usr/local/bin/steemd"
 ENV STEEMD_BIN ${STEEMD_BIN}
+
+RUN echo "This container has been built with the following options:" >> /steem_build.txt && \
+    echo "----\nsteemit/steem version/commit: ${steemd_version}\n----" >> /steem_build.txt && \
+    echo "Default steemd executable: ${STEEMD_BIN}\n----" >> /steem_build.txt && \
+    echo "LOW_MEMORY_MODE=${LOW_MEMORY_MODE}\nSTEEM_STATIC_BUILD=${STEEM_STATIC_BUILD}" >> /steem_build.txt && \
+    echo "SKIP_BY_TX_ID=${SKIP_BY_TX_ID}\nENABLE_MIRA=${ENABLE_MIRA}\nCLEAR_VOTES=${CLEAR_VOTES}" >> /steem_build.txt && \
+    echo "----\nBuilt at: $(date)\n----" >> /steem_build.txt
 
 RUN echo "Please configure me! You need to mount a data directory onto /steem of this container to it to function correctly. (if you're using Steem-in-a-box most of this is handled automatically)"
 CMD ["sh", "-c", "${STEEMD_BIN}"]
