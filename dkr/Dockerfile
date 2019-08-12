@@ -11,7 +11,7 @@ RUN apt-get update && \
     apt-get install -y autotools-dev build-essential libbz2-dev libicu-dev python-dev wget doxygen python3 python3-dev python3-pip libboost-all-dev curl && \
     apt-get clean -qy
 
-RUN pip3 install -U pip && pip3 install jinja2
+RUN pip3 install jinja2
 
 ###
 # Overridable build arguments
