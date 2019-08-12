@@ -735,14 +735,14 @@ pclogs() {
     fi
     # the sleep is a dirty hack to keep the pipe open
 
-    sleep 10000 < $pipe &
+    sleep 1000000 < $pipe &
     tail -n 5000 -f "$LOG_PATH" &> $pipe &
     while true
     do
         if read -r line <$pipe; then
             # first grep the data for "objects cached" to avoid
             # needlessly processing the data
-            L=$(grep --colour=never "objects cached" <<< "$line")
+            L=$(egrep --colour=never "objects cached|M free" <<< "$line")
             if [[ $? -ne 0 ]]; then
                 continue
             fi
