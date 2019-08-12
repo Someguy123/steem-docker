@@ -1062,7 +1062,7 @@ sb_clean() {
         msg bold red " !!! Clearing shared memory files..."
         rm -rvf "$SHM_DIR"/*
         mkdir -p "$SHM_DIR" &> /dev/null
-        msg bold green " +++ Cleared shaed memory files"
+        msg bold green " +++ Cleared shared memory files"
     else
         msg yellow " >> Not clearing shared memory folder."
     fi
