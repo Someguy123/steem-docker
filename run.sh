@@ -46,6 +46,23 @@ RESET="$(tput sgr0)"
 # default. override in .env
 : ${PORTS="2001"}
 
+# Internal variable. Set to 1 by build_full to inform child functions
+BUILD_FULL=0
+# Placeholder for custom tag var CUST_TAG (shared between functions)
+CUST_TAG="steem"
+# Placeholder for BUILD_VER shared between functions
+BUILD_VER=""
+
+# Array of additional arguments to be passed to Docker during builds
+# Generally populated using arguments passed to build/build_full
+# But you can specify custom additional build parameters by setting BUILD_ARGS
+# as an array in .env
+# e.g.
+#
+#    BUILD_ARGS=('--rm' '-q' '--compress')
+#
+BUILD_ARGS=()
+
 # easy coloured messages function
 # written by @someguy123
 function msg () {
@@ -184,18 +201,57 @@ optimize() {
     echo 30000 | sudo tee /proc/sys/vm/dirty_writeback_centisecs
 }
 
+parse_build_args() {
+    BUILD_VER=$1
+    CUST_TAG="steem:$BUILD_VER"
+    if (( $BUILD_FULL == 1 )); then
+        CUST_TAG+="-full"
+    fi
+    BUILD_ARGS+=('--build-arg' "steemd_version=${BUILD_VER}")
+    shift
+    if (( $# >= 2 )); then
+        if [[ "$1" == "tag" ]]; then
+            CUST_TAG="$2"
+            msg yellow " >> Custom re-tag specified. Will tag new image with '${CUST_TAG}'"
+            shift; shift;    # Get rid of the two tag arguments. Everything after is now build args
+        fi
+    fi
+    if (( $# >= 1 )); then
+        msg yellow " >> Additional build arguments specified."
+        for a in "$@"; do
+            msg yellow " ++ Build argument: ${BOLD}${a}"
+            BUILD_ARGS+=('--build-arg' "$a")
+        done
+    fi
+    msg blue " ++ CUSTOM BUILD SPECIFIED. Building from branch/tag ${BOLD}${BUILD_VER}"
+    msg blue " ++ Tagging final image as: ${BOLD}${CUST_TAG}"
+    msg yellow " -> Docker build arguments: ${BOLD}${BUILD_ARGS[@]}"
+}
+
 # Build standard low memory node as a docker image
-# Usage: ./run.sh build [version]
+# Usage: ./run.sh build [version] [tag tag_name] [build_args]
 # Version is prefixed with v, matching steem releases
 # e.g. build v0.20.6
+#
+# Override destination tag:
+#   ./run.sh build v0.21.0 tag 'steem:latest'
+#
+# Additional build args:
+#   ./run.sh build v0.21.0 ENABLE_MIRA=OFF
+#
+# Or combine both:
+#   ./run.sh build v0.21.0 tag 'steem:mira' ENABLE_MIRA=ON
+#
 build() {
-    if (( $# == 1 )); then
-        BUILD_VER=$1
-        echo "${BLUE}CUSTOM BUILD SPECIFIED. Building from branch/tag ${BUILD_VER}${RESET}"
+    fmm="Low Memory Mode (For Seed / Witness nodes)"
+    (( $BUILD_FULL == 1 )) && fmm="Full Memory Mode (For RPC nodes)" && DOCKER_DIR="$FULL_DOCKER_DIR"
+    BUILD_MSG=" >> Building docker container [[ ${fmm} ]]"
+    if (( $# >= 1 )); then
+        parse_build_args "$@"
         sleep 2
-        cd $DOCKER_DIR
-        CUST_TAG="steem:$BUILD_VER"
-        docker build --build-arg "steemd_version=$BUILD_VER" -t "$CUST_TAG" .
+        cd "$DOCKER_DIR"
+        msg bold green "$BUILD_MSG"
+        docker build "${BUILD_ARGS[@]}" -t "$CUST_TAG" .
         echo "${RED}
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
@@ -210,9 +266,18 @@ build() {
         "
         return
     fi
-    echo $GREEN"Building docker container"$RESET
-    cd $DOCKER_DIR
+    msg bold green "$BUILD_MSG"
+    cd "$DOCKER_DIR"
     docker build -t "$DOCKER_IMAGE" .
+    ret=$?
+    if (( $ret == 0 )); then
+        msg bold green " +++ Successfully built current stable steemd"
+        msg green " +++ Steem node type: ${BOLD}${fmm}"
+        msg green " +++ Docker tag: ${DOCKER_IMAGE}"
+    else
+        msg bold red " !!! ERROR: Something went wrong during the build process."
+        msg red " !!! Please scroll up and check for any error output during the build."
+    fi
 }
 
 # Build full memory node (for RPC nodes) as a docker image
@@ -220,30 +285,8 @@ build() {
 # Version is prefixed with v, matching steem releases
 # e.g. build_full v0.20.6
 build_full() {
-    if (( $# == 1 )); then
-        BUILD_VER=$1
-        echo $BLUE"CUSTOM (FULL NODE) BUILD SPECIFIED. Building from branch/tag $BUILD_VER"$RESET
-        sleep 2
-        cd $FULL_DOCKER_DIR
-        CUST_TAG="steem:$BUILD_VER-full"
-        docker build --build-arg "steemd_version=$BUILD_VER" -t "$CUST_TAG" .
-        echo "${RED}
-    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
-    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
-        For your safety, we've tagged this image as $CUST_TAG
-        To use it in this steem-docker, run: 
-        ${GREEN}${BOLD}
-        docker tag $CUST_TAG steem:latest
-        ${RESET}${RED}
-    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
-    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
-        ${RESET}
-        "
-        return
-    fi
-    echo $GREEN"Building full-node docker container"$RESET
-    cd $FULL_DOCKER_DIR
-    docker build -t "$DOCKER_IMAGE" .
+    BUILD_FULL=1
+    build "$@"
 }
 
 # Usage: ./run.sh dlblocks [override_dlmethod] [url] [compress]
