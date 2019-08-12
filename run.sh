@@ -823,7 +823,7 @@ simplecommitlog() {
         count="$2"
         args="-n $count $args"
     fi
-    git log --pretty=format:"$commit_format" $args
+    git --no-pager log --pretty=format:"$commit_format" $args
 }
 
 
@@ -894,7 +894,7 @@ ver() {
     # Used later on, for commands that depend on the image existing
     got_dkimg=0
     if [[ $(wc -c <<< "$dkimg_output") -lt 10 ]]; then
-        echo "${RED}WARNING: We could not find the currently installed image (steem:lateset)${RESET}"
+        echo "${RED}WARNING: We could not find the currently installed image (${DOCKER_IMAGE})${RESET}"
         echo "${RED}Make sure it's installed with './run.sh install' or './run.sh build'${RESET}"
     else
         echo "    $dkimg_output"
@@ -920,6 +920,9 @@ ver() {
 
     echo $LINE
 
+    msg green "Build information for currently installed Steem image '${DOCKER_IMAGE}':"
+
+    docker run --rm -it "${DOCKER_IMAGE}" cat /steem_build.txt
 
     echo "${BLUE}Steem version currently running:${RESET}"
     # Verify that the container exists, even if it's stopped
