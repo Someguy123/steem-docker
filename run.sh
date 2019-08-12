@@ -492,6 +492,16 @@ install_docker() {
 install() {
     if (( $# == 1 )); then
         DK_TAG=$1
+        # If neither '/' nor ':' are present in the tag, then for convenience, assume that the user wants
+        # someguy123/steem with this specific tag.
+        if grep -qv ':' <<< "$1"; then
+            if grep -qv '/' <<< "$1"; then
+                msg bold red "WARNING: Neither / nor : were present in your tag '$1'"
+                DK_TAG="someguy123/steem:$1"
+                msg red "We're assuming you've entered a version, and will try to install @someguy123's image: '${DK_TAG}'"
+                msg yellow "If you *really* specifically want '$1' from Docker hub, set DK_TAG='$1' inside of .env and run './run.sh install'"
+            fi
+        fi
     fi
     msg bold red "NOTE: You are installing image $DK_TAG. Please make sure this is correct."
     sleep 2
