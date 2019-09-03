@@ -1112,8 +1112,9 @@ sb_debug() {
         msg "${LINE}\n"
         msg "Steem-in-a-box Debug Log \nHostname: $(hostname) \nDate Checked: $(date)"
         msg "${LINE}\n\n\n"
-        
-        err yellow ">> Loading your config ($CONF_FILE) and redacting private key...\n"
+
+        err
+        err yellow " >> Loading your config ($CONF_FILE) and redacting private key...\n"
 
         CONFDATA=$(sed -E "s/private-key.*/private-key = 5xxxxxxxxxxxxxxx/" "$CONF_FILE")
         msg 
@@ -1131,7 +1132,7 @@ sb_debug() {
         git status
         msg " --- END GIT STATUS --- \n\n"
 
-        err yellow " >> Listing files inside of '$DIR' '$BCDIR' and '$SHM_DIR'"
+        err yellow " >> Listing files inside of '$DIR' '$BCDIR' and '$SHM_DIR'\n"
         
         msg " --- All files in DIR: $DIR ---"
         ls -lah "$DIR"
@@ -1213,10 +1214,10 @@ sb_debug() {
     msg green "Use 'cat $LOG' or 'nano $LOG' to view the log data"
     msg "\n=====================================================\n"
     if (( $auto == 1 )); then
-      msg bold green "Uploading log '$LOG' to termbin in 10 seconds. Press CTRL-C to cancel."
+      msg bold green "Uploading log '$LOG' to termbin in 10 seconds. Press CTRL-C to cancel.\n"
       sleep 10
       cat "$LOG" | nc termbin.com 9999
-      msg green "Please give the above link to the person helping you. You can look at it in your browser if you'd like to make sure there's no personal information"
+      msg green "\nPlease give the above link to the person helping you. You can look at it in your browser if you'd like to make sure there's no personal information"
       msg green "\n +++ Debug log completed. Exiting now."
       return 0
     fi
@@ -1233,9 +1234,9 @@ sb_debug() {
       read -p "Do you want to upload the log to termbin? (y)es/(e)dit/(n)o) > " yn
       case $yn in
         [Yy]* )
-          msg bold green "Uploading log '$LOG' to termbin"
+          msg bold green "Uploading log '$LOG' to termbin\n"
           cat "$LOG" | nc termbin.com 9999
-          msg green "Please give the above link to the person helping you. You can look at it in your browser if you'd like to make sure there's no personal information"
+          msg green "\nPlease give the above link to the person helping you. You can look at it in your browser if you'd like to make sure there's no personal information"
           break;;
         [Ee]* )
           msg "Opening $LOG in editor 'nano'"
