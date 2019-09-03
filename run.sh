@@ -1262,7 +1262,7 @@ case $1 in
         setup
         ;;
     debug)
-        sb_debug
+        sb_debug "${@:2}"
         ;;
     optimize)
         msg "Applying recommended dirty write settings..."
