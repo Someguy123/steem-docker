@@ -47,7 +47,7 @@ function msgts () {
     msg ts "${@:1}"
 }
 
-export -f msg msgx
+export -f msg msgts
 export RED GREEN YELLOW BLUE BOLD NORMAL RESET
 
 
