@@ -1109,15 +1109,15 @@ sb_debug() {
 
     {
         msg "Date Checked: $(date)"
-        err "Reading your config ($CONF_FILE) and redacting private key..."
+        err ">> Loading your config ($CONF_FILE) and redacting private key...\n"
         CONFDATA=$(sed -e "s/private-key = .*/private-key = 5xxxxxxxxxxxxxxx/" "$CONF_FILE")
         msg " --- CONFIG FILE @ $CONF_FILE --- "
         cat <<< "$CONFDATA"
         msg " --- END CONFIG --- "
-        err "Checking git status of your SIAB install"
+        err " >> Checking git status of your SIAB install\n"
         msg "--- Git Status: ---"
         git status
-        err "Listing files inside of '$DIR' '$BCDIR' and '$SHM_DIR'"
+        err " >> Listing files inside of '$DIR' '$BCDIR' and '$SHM_DIR'"
         msg "--- All files in DIR: $DIR ---"
         ls -lah "$DIR"
         msg "--- All files in BCDIR: $BCDIR ---"
@@ -1129,16 +1129,16 @@ sb_debug() {
     } >> "$LOG"
 
     {
-        err "Checking memory usage"
+        err " >> Checking memory usage\n"
         msg " --- FREE MEMORY / USAGE --- "
         free -m
         msg " --- END MEMORY --- \n\n"
 
-        err "Checking /dev/shm and disk space usage"
+        err " >> Checking /dev/shm and disk space usage\n"
         msg " --- FREE DISK/SHM PLUS USAGE --- "
         df -h
         msg " --- END DISK/SHM --- \n\n"
-        err "Scanning for OS version, SIAB version information, Docker containers + Images, and Docker version"
+        err " >> Scanning for OS version, SIAB version information, Docker containers + Images, and Docker version\n"
         msg " ------ VERSION INFORMATION -----"
         uname -a
         cat /etc/lsb-release
@@ -1155,23 +1155,29 @@ sb_debug() {
         docker -v
         cd "$P"
         msg " --- END VERSION INFO --- \n\n"
-        err "Dumping all environment variables (will attempt to filter out any that may contain passwords)"
+        err " >> Dumping all environment variables (will attempt to filter out any that may contain passwords)\n"
         printenv | grep -Evi "_pass|_pwd|unlock|_key"
     } >> "$LOG"
-
-    msg green "Log has been outputted to $LOG"
+    msg "\n=====================================================\n"
+    # Strip colour codes from log (https://unix.stackexchange.com/a/55547/166253)
+    sed -E -i 's/\x1B\[[0-9;]*[JKmsu]//g' "$LOG"
+    msg green "Log has been outputted to: ${BOLD}$LOG"
     msg green "Use 'cat $LOG' or 'nano $LOG' to view the log data"
+    msg "\n=====================================================\n"
     if (( $auto == 1 )); then
       msg bold green "Uploading log '$LOG' to termbin in 10 seconds. Press CTRL-C to cancel."
       sleep 10
       cat "$LOG" | nc termbin.com 9999
       msg green "Please give the above link to the person helping you. You can look at it in your browser if you'd like to make sure there's no personal information"
-      msg green "Debug log completed. Exiting now."
+      msg green "\n +++ Debug log completed. Exiting now."
       return 0
     fi
     if (( $upload != 1 )); then
-      msg yellow "Did not request upload (use '$0 debug upload' if you want to upload after dumping log)"
-      msg green "Debug log completed. Exiting now."
+      msg yellow "Did not request upload (use '$0 debug upload' if you want to upload after dumping log)\n"
+      msg yellow "Tip: Use '$0 debug upload' if you want to upload the log after dumping it - we'll let you view and edit the log before uploading it"
+      msg yellow "Tip: For use in shell scripts, or if you trust that the logs are safe to upload, you can use '$0 debug auto' to automatically upload " \
+                 "to Termbin after creating the log - with no prompts"
+      msg green "\n +++ Debug log completed. Exiting now."
       return 0
     fi
     while true; do
@@ -1194,7 +1200,7 @@ sb_debug() {
         * ) msg red "Please answer yes (y), edit (e), or no (n).";;
       esac
     done
-    msg green "Debug log completed. Exiting now."
+    msg green "\n +++ Debug log completed. Exiting now."
 }
 
 
