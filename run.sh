@@ -28,7 +28,6 @@ _DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # a damaged/incomplete block_log. Set to "no" to disable rsync when resuming.
 : ${BC_RSYNC="rsync://files.privex.io/steem/block_log"}
 
-: ${SHM_DIR="/dev/shm"}
 : ${REMOTE_WS="wss://steemd.privex.io"}
 # Amount of time in seconds to allow the docker container to stop before killing it.
 # Default: 600 seconds (10 minutes)
@@ -59,27 +58,42 @@ if [[ -f "${DIR}/.env" ]]; then
     source  "${DIR}/.env"
 fi
 
+
 # If MIRA is 1, will install someguy123/steem:latest-mira instead of latest
 # and automatically set ENABLE_MIRA to ON
 : ${MIRA=0}
 
 if [[ "$MIRA" -eq 1 ]]; then
+    : ${SHM_DIR="${DATADIR}/rocksdb"}
     : ${DK_TAG="someguy123/steem:latest-mira"}
     : ${DK_TAG_FULL="someguy123/steem:latest-mira-full"}
 else
+    : ${SHM_DIR="/dev/shm"}
     : ${DK_TAG="someguy123/steem:latest"}
     : ${DK_TAG_FULL="someguy123/steem:latest-full"}
 fi
 
 # blockchain folder, used by dlblocks
 : ${BC_FOLDER="$DATADIR/witness_node_data_dir/blockchain"}
-
+BCDIR="$BC_FOLDER"
 : ${EXAMPLE_MIRA="$DATADIR/witness_node_data_dir/database.cfg.example"}
 : ${MIRA_FILE="$DATADIR/witness_node_data_dir/database.cfg"}
 
 : ${EXAMPLE_CONF="$DATADIR/witness_node_data_dir/config.ini.example"}
 : ${CONF_FILE="$DATADIR/witness_node_data_dir/config.ini"}
 
+if [[ ! -d "${DATADIR}" ]]; then
+    echo " >> DATADIR Folder ${DATADIR} did not exist. Creating it."
+    mkdir -pv "${DATADIR}"
+fi
+if [[ ! -d "${BCDIR}" ]]; then
+    echo " >> BCDIR Folder ${BCDIR} did not exist. Creating it."
+    mkdir -pv "${BCDIR}"
+fi
+if [[ ! -d "${SHM_DIR}" ]]; then
+    echo " >> SHM_DIR Folder ${SHM_DIR} did not exist. Creating it."
+    mkdir -pv "${SHM_DIR}"
+fi
 # if the config file doesn't exist, try copying the example config
 if [[ ! -f "$CONF_FILE" ]]; then
     if [[ -f "$EXAMPLE_CONF" ]]; then
