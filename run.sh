@@ -1110,14 +1110,12 @@ sb_debug() {
     LINE="==================================================="
     {
         msg "${LINE}\n"
-        msg "Steem-in-a-box Debug Log\n" \
-            "Hostname: $(hostname)\n" \
-            "Date Checked: $(date)\n"
+        msg "Steem-in-a-box Debug Log \nHostname: $(hostname) \nDate Checked: $(date)"
         msg "${LINE}\n\n\n"
         
         err yellow ">> Loading your config ($CONF_FILE) and redacting private key...\n"
 
-        CONFDATA=$(sed -E "s/private-key/private-key = 5xxxxxxxxxxxxxxx/" "$CONF_FILE")
+        CONFDATA=$(sed -E "s/private-key.*/private-key = 5xxxxxxxxxxxxxxx/" "$CONF_FILE")
         msg 
         msg "${LINE}"
         msg " --- CONFIG FILE @ $CONF_FILE --- "
@@ -1125,7 +1123,7 @@ sb_debug() {
 
         cat <<< "$CONFDATA"
         msg "\n\n${LINE}"
-        msg " --- END CONFIG --- \n\n"
+        msg " --- END CONFIG ---"
         msg "${LINE}\n\n\n"
 
         err yellow " >> Checking git status of your SIAB install\n"
@@ -1133,7 +1131,7 @@ sb_debug() {
         git status
         msg " --- END GIT STATUS --- \n\n"
 
-        err " >> Listing files inside of '$DIR' '$BCDIR' and '$SHM_DIR'"
+        err yellow " >> Listing files inside of '$DIR' '$BCDIR' and '$SHM_DIR'"
         
         msg " --- All files in DIR: $DIR ---"
         ls -lah "$DIR"
@@ -1147,63 +1145,63 @@ sb_debug() {
         ls -lah "$SHM_DIR"
         msg "--- END SHM_DIR FILES ---\n\n"
 
+        msg "\n\n\n${LINE}\n\n\n"
     } >> "$LOG"
 
-    msg "\n\n\n${LINE}\n\n\n"
 
     {
-        err " >> Checking memory usage\n"
+        err yellow " >> Checking memory usage\n"
         msg " --- FREE MEMORY / USAGE --- "
         free -m
         msg " --- END MEMORY --- \n\n"
 
-        err " >> Checking /dev/shm and disk space usage\n"
+        err yellow  " >> Checking /dev/shm and disk space usage\n"
         msg " --- FREE DISK/SHM PLUS USAGE --- "
         df -h
         msg " --- END DISK/SHM --- \n\n"
-        err " >> Scanning for OS version, SIAB version information, Docker containers + Images, and Docker version\n"
+        err yellow " >> Scanning for OS version, SIAB version information, Docker containers + Images, and Docker version\n"
         msg " ------ VERSION INFORMATION -----"
         msg "\n${LINE}\n"
+        msg "Output of 'uname -a':\n"
         uname -a
         msg "\n${LINE}\n"
 
+        msg "Contents of '/etc/lsb-release':\n"
         cat /etc/lsb-release
         msg "\n${LINE}\n"
 
         P=$(pwd)
         cd "$DIR"
 
-        msg "\n${LINE}\n"
-        msg "SIAB GIT STATUS:"
+        msg "SIAB GIT STATUS:\n"
         git status
         git log | head -n 15
         
         msg "\n${LINE}\n"
-        msg "DOCKER IMAGES:"
+        msg "DOCKER IMAGES:\n"
         docker images
         
         msg "\n${LINE}\n"
-        msg "RUNNING CONTAINERS:"
+        msg "RUNNING CONTAINERS:\n"
         docker ps -a >> "$LOG"
 
         msg "\n${LINE}\n"
-        msg "DOCKER VERSION:"
+        msg "DOCKER VERSION:\n"
         docker -v
         cd "$P"
         msg " --- END VERSION INFO --- \n\n"
         msg "\n${LINE}\n"
         
-        err " >> Dumping all environment variables (will attempt to filter out any that may contain passwords)\n"
+        err yellow " >> Dumping all environment variables (will attempt to filter out any that may contain passwords)\n"
         msg " --- All environment variables present --- \n\n"
-        printenv | grep -Evi "_pass|_pwd|unlock|_key"
+        unset CONFDATA LS_COLORS &>/dev/null   # These two env vars are spammy in the log, and not needed
+        set -o posix ; set | grep -Evi "_pass|_pwd|unlock|_key|token"
         msg "\n${LINE}\n"
         
-        msg "\n\n --- END ENVIRONMENT VARS --- \n\n"
+        msg "--- END ENVIRONMENT VARS --- \n"
 
         msg "${LINE}\n\n"
-        msg "End of Steem-in-a-box Debug Log\n" \
-            "Hostname: $(hostname)\n" \
-            "Date Checked: $(date)\n"
+        msg "End of Steem-in-a-box Debug Log \nHostname: $(hostname)\nDate Checked: $(date)"
         msg "${LINE}\n\n"
 
 
