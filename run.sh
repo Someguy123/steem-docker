@@ -1091,7 +1091,7 @@ sb_clean() {
 }
 
 err() {
-    printf "%s\n" "$*" >&2;
+    msg "$@" >&2;
 }
 
 sb_debug() {
@@ -1107,26 +1107,49 @@ sb_debug() {
         shift
     done
 
+    LINE="==================================================="
     {
-        msg "Date Checked: $(date)"
-        err ">> Loading your config ($CONF_FILE) and redacting private key...\n"
-        CONFDATA=$(sed -e "s/private-key = .*/private-key = 5xxxxxxxxxxxxxxx/" "$CONF_FILE")
+        msg "${LINE}\n"
+        msg "Steem-in-a-box Debug Log\n" \
+            "Hostname: $(hostname)\n" \
+            "Date Checked: $(date)\n"
+        msg "${LINE}\n\n\n"
+        
+        err yellow ">> Loading your config ($CONF_FILE) and redacting private key...\n"
+
+        CONFDATA=$(sed -E "s/private-key/private-key = 5xxxxxxxxxxxxxxx/" "$CONF_FILE")
+        msg 
+        msg "${LINE}"
         msg " --- CONFIG FILE @ $CONF_FILE --- "
+        msg "${LINE}\n\n\n"
+
         cat <<< "$CONFDATA"
-        msg " --- END CONFIG --- "
-        err " >> Checking git status of your SIAB install\n"
-        msg "--- Git Status: ---"
+        msg "\n\n${LINE}"
+        msg " --- END CONFIG --- \n\n"
+        msg "${LINE}\n\n\n"
+
+        err yellow " >> Checking git status of your SIAB install\n"
+        msg " --- Git Status: ---"
         git status
+        msg " --- END GIT STATUS --- \n\n"
+
         err " >> Listing files inside of '$DIR' '$BCDIR' and '$SHM_DIR'"
-        msg "--- All files in DIR: $DIR ---"
+        
+        msg " --- All files in DIR: $DIR ---"
         ls -lah "$DIR"
+        msg "--- END DIR FILES ---\n\n"
+
         msg "--- All files in BCDIR: $BCDIR ---"
         ls -lah "$BCDIR"
         msg "--- END BCDIR FILES ---\n\n"
+
         msg "--- All files in SHM_DIR: $SHM_DIR --- "
         ls -lah "$SHM_DIR"
         msg "--- END SHM_DIR FILES ---\n\n"
+
     } >> "$LOG"
+
+    msg "\n\n\n${LINE}\n\n\n"
 
     {
         err " >> Checking memory usage\n"
@@ -1140,23 +1163,50 @@ sb_debug() {
         msg " --- END DISK/SHM --- \n\n"
         err " >> Scanning for OS version, SIAB version information, Docker containers + Images, and Docker version\n"
         msg " ------ VERSION INFORMATION -----"
+        msg "\n${LINE}\n"
         uname -a
+        msg "\n${LINE}\n"
+
         cat /etc/lsb-release
+        msg "\n${LINE}\n"
+
         P=$(pwd)
         cd "$DIR"
+
+        msg "\n${LINE}\n"
         msg "SIAB GIT STATUS:"
         git status
         git log | head -n 15
+        
+        msg "\n${LINE}\n"
         msg "DOCKER IMAGES:"
         docker images
+        
+        msg "\n${LINE}\n"
         msg "RUNNING CONTAINERS:"
         docker ps -a >> "$LOG"
+
+        msg "\n${LINE}\n"
         msg "DOCKER VERSION:"
         docker -v
         cd "$P"
         msg " --- END VERSION INFO --- \n\n"
+        msg "\n${LINE}\n"
+        
         err " >> Dumping all environment variables (will attempt to filter out any that may contain passwords)\n"
+        msg " --- All environment variables present --- \n\n"
         printenv | grep -Evi "_pass|_pwd|unlock|_key"
+        msg "\n${LINE}\n"
+        
+        msg "\n\n --- END ENVIRONMENT VARS --- \n\n"
+
+        msg "${LINE}\n\n"
+        msg "End of Steem-in-a-box Debug Log\n" \
+            "Hostname: $(hostname)\n" \
+            "Date Checked: $(date)\n"
+        msg "${LINE}\n\n"
+
+
     } >> "$LOG"
     msg "\n=====================================================\n"
     # Strip colour codes from log (https://unix.stackexchange.com/a/55547/166253)
