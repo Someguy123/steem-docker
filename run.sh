@@ -4,7 +4,9 @@
 # Released under GNU AGPL by Someguy123
 #
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+: ${DIR="$_DIR"}
+
 : ${DOCKER_DIR="$DIR/dkr"}
 : ${FULL_DOCKER_DIR="$DIR/dkr_fullnode"}
 : ${DATADIR="$DIR/data"}
@@ -26,17 +28,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # a damaged/incomplete block_log. Set to "no" to disable rsync when resuming.
 : ${BC_RSYNC="rsync://files.privex.io/steem/block_log"}
 
-BOLD="$(tput bold)"
-RED="$(tput setaf 1)"
-GREEN="$(tput setaf 2)"
-YELLOW="$(tput setaf 3)"
-BLUE="$(tput setaf 4)"
-MAGENTA="$(tput setaf 5)"
-CYAN="$(tput setaf 6)"
-WHITE="$(tput setaf 7)"
-RESET="$(tput sgr0)"
-: ${DK_TAG="someguy123/steem:latest"}
-: ${DK_TAG_FULL="someguy123/steem:latest-full"}
 : ${SHM_DIR="/dev/shm"}
 : ${REMOTE_WS="wss://steemd.privex.io"}
 # Amount of time in seconds to allow the docker container to stop before killing it.
@@ -63,35 +54,21 @@ BUILD_VER=""
 #
 BUILD_ARGS=()
 
-# easy coloured messages function
-# written by @someguy123
-function msg () {
-    # usage: msg [color] message
-    if [[ "$#" -eq 0 ]]; then echo ""; return; fi;
-    if [[ "$#" -eq 1 ]]; then
-        echo -e "$1"
-        return
-    fi
-    if [[ "$#" -gt 2 ]] && [[ "$1" == "bold" ]]; then
-        echo -n "${BOLD}"
-        shift
-    fi
-    _msg="[$(date +'%Y-%m-%d %H:%M:%S %Z')] ${@:2}"
-    case "$1" in
-        bold) echo -e "${BOLD}${_msg}${RESET}";;
-        [Bb]*) echo -e "${BLUE}${_msg}${RESET}";;
-        [Yy]*) echo -e "${YELLOW}${_msg}${RESET}";;
-        [Rr]*) echo -e "${RED}${_msg}${RESET}";;
-        [Gg]*) echo -e "${GREEN}${_msg}${RESET}";;
-        * ) echo -e "${_msg}";;
-    esac
-}
 
-export -f msg
-export RED GREEN YELLOW BLUE BOLD NORMAL RESET
+if [[ -f "${DIR}/.env" ]]; then
+    source  "${DIR}/.env"
+fi
 
-if [[ -f .env ]]; then
-    source .env
+# If MIRA is 1, will install someguy123/steem:latest-mira instead of latest
+# and automatically set ENABLE_MIRA to ON
+: ${MIRA=0}
+
+if [[ "$MIRA" -eq 1 ]]; then
+    : ${DK_TAG="someguy123/steem:latest-mira"}
+    : ${DK_TAG_FULL="someguy123/steem:latest-mira-full"}
+else
+    : ${DK_TAG="someguy123/steem:latest"}
+    : ${DK_TAG_FULL="someguy123/steem:latest-full"}
 fi
 
 # blockchain folder, used by dlblocks
@@ -143,7 +120,9 @@ for i in $PORTS; do
 done
 
 # load docker hub API
-source scripts/000_docker.sh
+source "${DIR}/scripts/000_docker.sh"
+source "${DIR}/scripts/helpers.sh"
+
 
 help() {
     echo "Usage: $0 COMMAND [DATA]"
@@ -173,33 +152,29 @@ help() {
     exit
 }
 
-APT_UPDATED="n"
-pkg_not_found() {
-    # check if a command is available
-    # if not, install it from the package specified
-    # Usage: pkg_not_found [cmd] [apt-package]
-    # e.g. pkg_not_found git git
-    if [[ $# -lt 2 ]]; then
-        echo "${RED}ERR: pkg_not_found requires 2 arguments (cmd) (package)${NORMAL}"
-        exit
-    fi
-    local cmd=$1
-    local pkg=$2
-    if ! [ -x "$(command -v $cmd)" ]; then
-        echo "${YELLOW}WARNING: Command $cmd was not found. installing now...${NORMAL}"
-        if [[ "$APT_UPDATED" == "n" ]]; then
-            sudo apt update -y
-            APT_UPDATED="y"
-        fi
-        sudo apt install -y "$pkg"
-    fi
-}
 
 optimize() {
     echo    75 | sudo tee /proc/sys/vm/dirty_background_ratio
     echo  1000 | sudo tee /proc/sys/vm/dirty_expire_centisecs
     echo    80 | sudo tee /proc/sys/vm/dirty_ratio
     echo 30000 | sudo tee /proc/sys/vm/dirty_writeback_centisecs
+}
+
+# Determines whether ENABLE_MIRA was passed in custom build args
+# so we don't have to fall back to $MIRA
+export MIRA_SET=0
+
+should_build_mira() {
+    if (( $MIRA_SET == 0 )); then
+        msg bold yellow "No ENABLE_MIRA build argument was specified. Falling back to MIRA env option."
+        if (( $MIRA == 1 )); then
+            msg yellow " >> Enabling MIRA - setting 'ENABLE_MIRA=ON' as MIRA env var was set to 1"
+            BUILD_ARGS+=('--build-arg' "ENABLE_MIRA=ON")
+        else
+            msg yellow " >> Disabling MIRA - setting 'ENABLE_MIRA=OFF' as MIRA env var wasn't 1 (defaults to 0)"
+            BUILD_ARGS+=('--build-arg' "ENABLE_MIRA=OFF")
+        fi
+    fi
 }
 
 parse_build_args() {
@@ -221,6 +196,7 @@ parse_build_args() {
         msg yellow " >> Additional build arguments specified."
         for a in "$@"; do
             msg yellow " ++ Build argument: ${BOLD}${a}"
+            grep -qi "ENABLE_MIRA" <<< "$a" && MIRA_SET=1
             BUILD_ARGS+=('--build-arg' "$a")
         done
     fi
@@ -248,7 +224,10 @@ build() {
     (( $BUILD_FULL == 1 )) && fmm="Full Memory Mode (For RPC nodes)" && DOCKER_DIR="$FULL_DOCKER_DIR"
     BUILD_MSG=" >> Building docker container [[ ${fmm} ]]"
     if (( $# >= 1 )); then
+        # Scan arguments for tag and build arguments, will set CUST_TAG and append to BUILD_ARGS
         parse_build_args "$@"
+        # Check if the user specified ENABLE_MIRA in their build args. If not, fallback to default using $MIRA
+        should_build_mira
         sleep 2
         cd "$DOCKER_DIR"
         msg bold green "$BUILD_MSG"
@@ -279,12 +258,14 @@ build() {
         return
     fi
     msg bold green "$BUILD_MSG"
+    should_build_mira
     cd "$DOCKER_DIR"
-    docker build -t "$DOCKER_IMAGE" .
+    docker build "${BUILD_ARGS[@]}" -t "$DOCKER_IMAGE" .
     ret=$?
     if (( $ret == 0 )); then
         msg bold green " +++ Successfully built current stable steemd"
         msg green " +++ Steem node type: ${BOLD}${fmm}"
+        msg green " +++ Build args: ${BOLD}${BUILD_ARGS[@]}"
         msg green " +++ Docker tag: ${DOCKER_IMAGE}"
     else
         msg bold red " !!! ERROR: Something went wrong during the build process."
@@ -299,6 +280,33 @@ build() {
 build_full() {
     BUILD_FULL=1
     build "$@"
+}
+
+setup() {
+    cd "$DIR"
+    git pull
+    git submodule update --init --recursive
+
+    msg green "================================================================\n"
+    msg green "Welcome to the Easy Setup Tool for Steem-in-a-box.\n"
+    msg green "Developed by Someguy123 ( https://steemit.com/@someguy123 )"
+    msg green "Blockchain files hosted by Privex ( www.privex.io || steemit.com/@privex )\n"
+    msg green "================================================================\n"
+    msg yellow " --- Below are the defaults we use, if you don't specify: ---"
+    msg yellow "\tEnable MIRA:\t No"
+    msg yellow "\tDownload Blocks:\t No"
+    msg yellow "\tContainer Name:\t seed"
+    msg yellow "\tLow Memory Mode:\t Yes"
+    msg yellow "\tExpose Ports:\t 2001\t (Default P2P port)"
+    msg yellow "\t/dev/shm size:\t 64G\t (Only if MIRA is enabled)"
+    msg yellow "--------------------------\n\n"
+    msg bold green " +++ First, we strongly recommend running this setup tool in 'screen' or 'tmux' +++ "
+    msg green " +++ This ensures the setup does not get interrupted if you get disconnected from SSH +++"
+
+    if yesno "${YELLOW}Do you wish to continue? (Y/n) > ${RESET}" defyes invert; then
+        return 1
+    fi
+
 }
 
 # Usage: ./run.sh dlblocks [override_dlmethod] [url] [compress]
@@ -1126,6 +1134,9 @@ case $1 in
         ;;
     clean)
         sb_clean "${@:2}"
+        ;;
+    setup)
+        setup
         ;;
     optimize)
         msg "Applying recommended dirty write settings..."

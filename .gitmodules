@@ -1,0 +1,3 @@
+[submodule "scripts/steem-bash"]
+	path = scripts/steem-bash
+	url = https://github.com/someguy123/steem-bash
