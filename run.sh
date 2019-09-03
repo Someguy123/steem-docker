@@ -1,19 +1,30 @@
 #!/bin/bash
 #
-# Steem node manager
+# Steem-in-a-box Main Application Script
+#
+# Steem-in-a-box (or SIAB for short) is a collection of bash scripts designed to make
+# setting up and maintaining steemd (Steem Daemon) easy, whether you're using it for
+# a seed node, a witness, or an RPC full node.
+#
+# Primarily designed for use on Ubuntu Server (16.04 or 18.04), but may
+# work on other Debian-based distros.
+#
 # Released under GNU AGPL by Someguy123
+# https://github.com/someguy123/steem-docker
 #
 
+# _DIR should be able to determine the absolute path where run.sh is located
 _DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-: ${DIR="$_DIR"}
+# If something is wrong with _DIR attempting to locate SIAB, you can override DIR from the CLI
+# e.g. export SIAB_DIR='/steem'; ./run.sh logs
+: ${SIAB_DIR="$_DIR"}
+DIR="$SIAB_DIR"              # The folder where Steem-in-a-box (steem-docker) is located
 
-: ${DOCKER_DIR="$DIR/dkr"}
-: ${FULL_DOCKER_DIR="$DIR/dkr_fullnode"}
-: ${DATADIR="$DIR/data"}
-: ${DOCKER_NAME="seed"}
-
-# the tag to use when running/replaying steemd
-: ${DOCKER_IMAGE="steem"}
+: ${DOCKER_DIR="$DIR/dkr"}                 # Folder containing Dockerfile used to build Steem low memory node
+: ${FULL_DOCKER_DIR="$DIR/dkr_fullnode"}   # Folder containing Dockerfile used to build Steem full node
+: ${DATADIR="$DIR/data"}     # Location of the Steem 'data' folder (generally contains witness_node_data_dir)
+: ${DOCKER_NAME="seed"}      # A unique name to use for the docker container created by this SIAB install
+: ${DOCKER_IMAGE="steem"}    # The tag name of the docker image to use when starting/replaying Steem
 
 
 # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
@@ -36,12 +47,8 @@ _DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # default. override in .env
 : ${PORTS="2001"}
 
-# Internal variable. Set to 1 by build_full to inform child functions
-BUILD_FULL=0
-# Placeholder for custom tag var CUST_TAG (shared between functions)
-CUST_TAG="steem"
-# Placeholder for BUILD_VER shared between functions
-BUILD_VER=""
+# Placeholder variables - used internally by functions. Do not touch.
+BUILD_FULL=0 CUST_TAG="steem" BUILD_VER=""
 
 # Array of additional arguments to be passed to Docker during builds
 # Generally populated using arguments passed to build/build_full
@@ -54,13 +61,11 @@ BUILD_VER=""
 BUILD_ARGS=()
 
 
-if [[ -f "${DIR}/.env" ]]; then
-    source  "${DIR}/.env"
-fi
+[[ -f "${DIR}/.env" ]] && source  "${DIR}/.env"
 
 
 # If MIRA is 1, will install someguy123/steem:latest-mira instead of latest
-# and automatically set ENABLE_MIRA to ON
+# and automatically set ENABLE_MIRA to ON when building.
 : ${MIRA=0}
 
 if [[ "$MIRA" -eq 1 ]]; then
@@ -73,27 +78,22 @@ else
     : ${DK_TAG_FULL="someguy123/steem:latest-full"}
 fi
 
+# Witness Node Data Dir (home of config.ini and blockchain etc.)
+: ${WITDIR="$DATADIR/witness_node_data_dir"}
 # blockchain folder, used by dlblocks
-: ${BC_FOLDER="$DATADIR/witness_node_data_dir/blockchain"}
+: ${BC_FOLDER="$WITDIR/blockchain"}
 BCDIR="$BC_FOLDER"
-: ${EXAMPLE_MIRA="$DATADIR/witness_node_data_dir/database.cfg.example"}
-: ${MIRA_FILE="$DATADIR/witness_node_data_dir/database.cfg"}
+: ${EXAMPLE_MIRA="$WITDIR/database.cfg.example"}
+: ${MIRA_FILE="$WITDIR/database.cfg"}
 
-: ${EXAMPLE_CONF="$DATADIR/witness_node_data_dir/config.ini.example"}
-: ${CONF_FILE="$DATADIR/witness_node_data_dir/config.ini"}
+: ${EXAMPLE_CONF="$WITDIR/config.ini.example"}
+: ${CONF_FILE="$WITDIR/config.ini"}
 
-if [[ ! -d "${DATADIR}" ]]; then
-    echo " >> DATADIR Folder ${DATADIR} did not exist. Creating it."
-    mkdir -pv "${DATADIR}"
-fi
-if [[ ! -d "${BCDIR}" ]]; then
-    echo " >> BCDIR Folder ${BCDIR} did not exist. Creating it."
-    mkdir -pv "${BCDIR}"
-fi
-if [[ ! -d "${SHM_DIR}" ]]; then
-    echo " >> SHM_DIR Folder ${SHM_DIR} did not exist. Creating it."
-    mkdir -pv "${SHM_DIR}"
-fi
+[[ ! -d "${WITDIR}" ]] && msg " >> WITDIR Folder ${WITDIR} did not exist. Creating it." && mkdir -pv "${WITDIR}"
+[[ ! -d "${DATADIR}" ]] && msg " >> DATADIR Folder ${DATADIR} did not exist. Creating it." && mkdir -pv "${DATADIR}"
+[[ ! -d "${BCDIR}" ]] && msg " >> BCDIR Folder ${BCDIR} did not exist. Creating it." && mkdir -pv "${BCDIR}"
+[[ ! -d "${SHM_DIR}" ]] && msg " >> SHM_DIR Folder ${SHM_DIR} did not exist. Creating it." && mkdir -pv "${SHM_DIR}"
+
 # if the config file doesn't exist, try copying the example config
 if [[ ! -f "$CONF_FILE" ]]; then
     if [[ -f "$EXAMPLE_CONF" ]]; then
@@ -129,7 +129,7 @@ IFS=","
 DPORTS=()
 for i in $PORTS; do
     if [[ $i != "" ]]; then
-	    DPORTS+=("-p0.0.0.0:$i:$i")
+      DPORTS+=("-p0.0.0.0:$i:$i")
     fi
 done
 
@@ -359,30 +359,30 @@ dlblocks() {
     pkg_not_found xz xz-utils
     
     [[ ! -d "$BC_FOLDER" ]] && mkdir -p "$BC_FOLDER"
-    [[ -f "$BC_FOLDER/block_log.index" ]] && msg "Removing old block index" && sudo rm -vf "$BC_FOLDER/block_log.index" 2> /dev/null
+    [[ -f "$BC_FOLDER/block_log.index" ]] && msgts "Removing old block index" && sudo rm -vf "$BC_FOLDER/block_log.index" 2> /dev/null
 
     if (( $# > 0 )); then
         custom-dlblocks "$@"
         return $?
     fi
     if [[ -f "$BC_FOLDER/block_log" ]]; then
-        msg yellow "It looks like block_log already exists"
+        msgts yellow "It looks like block_log already exists"
         if [[ "$BC_RSYNC" == "no" ]]; then
-            msg red "As BC_RSYNC is set to 'no', we're just going to try to retry the http download"
-            msg "If your HTTP source is uncompressed, we'll try to resume it"
+            msgts red "As BC_RSYNC is set to 'no', we're just going to try to retry the http download"
+            msgts "If your HTTP source is uncompressed, we'll try to resume it"
             dl-blocks-http "$BC_HTTP" "$BC_HTTP_CMP"
             return
         else
-            msg green "We'll now use rsync to attempt to repair any corruption, or missing pieces from your block_log."
+            msgts green "We'll now use rsync to attempt to repair any corruption, or missing pieces from your block_log."
             dl-blocks-rsync "$BC_RSYNC"
             return
         fi
     fi
-    msg "No existing block_log found. Will use standard http to download, and will\n also decompress lz4 while downloading, to save time."
-    msg "If you encounter an error while downloading the block_log, just run dlblocks again,\n and it will use rsync to resume and repair it"
+    msgts "No existing block_log found. Will use standard http to download, and will\n also decompress lz4 while downloading, to save time."
+    msgts "If you encounter an error while downloading the block_log, just run dlblocks again,\n and it will use rsync to resume and repair it"
     dl-blocks-http "$BC_HTTP" "$BC_HTTP_CMP" 
-    msg "FINISHED. Blockchain installed to ${BC_FOLDER}/block_log (make sure to check for any errors above)"
-    msg red "If you encountered an error while downloading the block_log, just run dlblocks again\n and it will use rsync to resume and repair it"
+    msgts "FINISHED. Blockchain installed to ${BC_FOLDER}/block_log (make sure to check for any errors above)"
+    msgts red "If you encountered an error while downloading the block_log, just run dlblocks again\n and it will use rsync to resume and repair it"
     echo "Remember to resize your /dev/shm, and run with replay!"
     echo "$ ./run.sh shm_size SIZE (e.g. 8G)"
     echo "$ ./run.sh replay"
@@ -407,7 +407,7 @@ custom-dlblocks() {
             return $?
             ;;
         rsync-replace)
-            msg yellow " -> Removing old block_log..."
+            msgts yellow " -> Removing old block_log..."
             sudo rm -vf "$BC_FOLDER/block_log"
             dl-blocks-rsync "$url"
             return $?
@@ -417,14 +417,14 @@ custom-dlblocks() {
             return $? 
             ;;
         http-replace)
-            msg yellow " -> Removing old block_log..."
+            msgts yellow " -> Removing old block_log..."
             sudo rm -vf "$BC_FOLDER/block_log"
             dl-blocks-http "$url" "$compress"
             return $?
             ;;
         *)
-            msg red "Invalid download method"
-            msg red "Valid options are http, http-replace, rsync, or rsync-replace"
+            msgts red "Invalid download method"
+            msgts red "Valid options are http, http-replace, rsync, or rsync-replace"
             return 1
             ;;
     esac 
@@ -434,8 +434,8 @@ custom-dlblocks() {
 # Usage: dl-blocks-rsync blocklog_url
 dl-blocks-rsync() {
     local url="$1"
-    msg "This may take a while, and may at times appear to be stalled. ${YELLOW}${BOLD}Be patient, it takes time (3 to 10 mins) to scan the differences."
-    msg "Once it detects the differences, it will download at very high speed depending on how much of your block_log is intact."
+    msgts "This may take a while, and may at times appear to be stalled. ${YELLOW}${BOLD}Be patient, it takes time (3 to 10 mins) to scan the differences."
+    msgts "Once it detects the differences, it will download at very high speed depending on how much of your block_log is intact."
     echo -e "\n==============================================================="
     echo -e "${BOLD}Downloading via:${RESET}\t${url}"
     echo -e "${BOLD}Writing to:${RESET}\t\t${BC_FOLDER}/block_log"
@@ -445,9 +445,9 @@ dl-blocks-rsync() {
     rsync -Ivvh --append-verify --progress "$url" "${BC_FOLDER}/block_log"
     ret=$?
     if (($ret==0)); then
-        msg bold green " (+) FINISHED. Blockchain downloaded via rsync (make sure to check for any errors above)"
+        msgts bold green " (+) FINISHED. Blockchain downloaded via rsync (make sure to check for any errors above)"
     else
-        msg bold red "An error occurred while downloading via rsync... please check above for errors"
+        msgts bold red "An error occurred while downloading via rsync... please check above for errors"
     fi
     return $ret
 }
@@ -457,7 +457,7 @@ dl-blocks-rsync() {
 dl-blocks-http() {
     local url="$1"
     local compression="no"
-    (( $# < 1 )) && msg bold red "ERROR: no url specified for dl-blocks-http" && return 1
+    (( $# < 1 )) && msgts bold red "ERROR: no url specified for dl-blocks-http" && return 1
     if (( $# == 2 )); then
         compression="$2"
         if [[ "$2" != "lz4" && "$2" != "xz" && "$2" != "no" ]]; then
@@ -475,9 +475,9 @@ dl-blocks-http() {
     echo -e "===============================================================\n"
 
     if [[ "$compression" != "no" ]]; then 
-        msg bold green " -> Downloading and de-compressing block log on-the-fly..."
+        msgts bold green " -> Downloading and de-compressing block log on-the-fly..."
     else
-        msg bold green " -> Downloading raw block log..."
+        msgts bold green " -> Downloading raw block log..."
     fi
 
     case "$compression" in 
@@ -493,9 +493,9 @@ dl-blocks-http() {
     esac
     ret=$?
     if (($ret==0)); then
-        msg bold green " (+) FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
+        msgts bold green " (+) FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
     else
-        msg bold red "An error occurred while downloading... please check above for errors"
+        msgts bold red "An error occurred while downloading... please check above for errors"
     fi
     return $ret
 }
@@ -531,20 +531,20 @@ install() {
         # someguy123/steem with this specific tag.
         if grep -qv ':' <<< "$1"; then
             if grep -qv '/' <<< "$1"; then
-                msg bold red "WARNING: Neither / nor : were present in your tag '$1'"
+                msgts bold red "WARNING: Neither / nor : were present in your tag '$1'"
                 DK_TAG="someguy123/steem:$1"
-                msg red "We're assuming you've entered a version, and will try to install @someguy123's image: '${DK_TAG}'"
-                msg yellow "If you *really* specifically want '$1' from Docker hub, set DK_TAG='$1' inside of .env and run './run.sh install'"
+                msgts red "We're assuming you've entered a version, and will try to install @someguy123's image: '${DK_TAG}'"
+                msgts yellow "If you *really* specifically want '$1' from Docker hub, set DK_TAG='$1' inside of .env and run './run.sh install'"
             fi
         fi
     fi
-    msg bold red "NOTE: You are installing image $DK_TAG. Please make sure this is correct."
+    msgts bold red "NOTE: You are installing image $DK_TAG. Please make sure this is correct."
     sleep 2
-    msg yellow " -> Loading image from ${DK_TAG}"
+    msgts yellow " -> Loading image from ${DK_TAG}"
     docker pull "$DK_TAG"
-    msg green " -> Tagging as steem"
+    msgts green " -> Tagging as steem"
     docker tag "$DK_TAG" steem
-    msg bold green " -> Installation completed. You may now configure or run the server"
+    msgts bold green " -> Installation completed. You may now configure or run the server"
 }
 
 # Usage: ./run.sh install_full
@@ -552,11 +552,11 @@ install() {
 # Default tag is normally someguy123/steem:latest-full (official builds by the creator of steem-docker).
 #
 install_full() {
-    msg yellow " -> Loading image from ${DK_TAG_FULL}"
+    msgts yellow " -> Loading image from ${DK_TAG_FULL}"
     docker pull "$DK_TAG_FULL" 
-    msg green " -> Tagging as steem"
+    msgts green " -> Tagging as steem"
     docker tag "$DK_TAG_FULL" steem
-    msg bold green " -> Installation completed. You may now configure or run the server"
+    msgts bold green " -> Installation completed. You may now configure or run the server"
 }
 
 # Internal Use Only
@@ -590,7 +590,7 @@ seed_running() {
 # Usage: ./run.sh start
 # Creates and/or starts the Steem docker container
 start() {
-    msg bold green " -> Starting container '${DOCKER_NAME}'..."
+    msgts bold green " -> Starting container '${DOCKER_NAME}'..."
     seed_exists
     if [[ $? == 0 ]]; then
         docker start $DOCKER_NAME
@@ -619,11 +619,11 @@ replay() {
             return
         fi
     fi 
-    msg yellow " -> Removing old container '${DOCKER_NAME}'"
+    msgts yellow " -> Removing old container '${DOCKER_NAME}'"
     docker rm $DOCKER_NAME
-    msg green " -> Running steem (image: ${DOCKER_IMAGE}) with replay in container '${DOCKER_NAME}'..."
+    msgts green " -> Running steem (image: ${DOCKER_IMAGE}) with replay in container '${DOCKER_NAME}'..."
     docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir --replay
-    msg bold green " -> Started."
+    msgts bold green " -> Started."
 }
 
 # For MIRA, replay with --memory-replay
@@ -631,16 +631,16 @@ memory_replay() {
     seed_running
     if [[ $? == 0 ]]; then
         echo $RED"WARNING: Your Steem server ($DOCKER_NAME) is currently running"$RESET
-	echo
+  echo
         docker ps
-	echo
-	read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
+  echo
+  read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
         if [[ "$shouldstop" == "y" ]]; then
-		stop
-	else
-		echo $GREEN"Did not say 'y'. Quitting."$RESET
-		return
-	fi
+    stop
+  else
+    echo $GREEN"Did not say 'y'. Quitting."$RESET
+    return
+  fi
     fi 
     echo "Removing old container"
     docker rm $DOCKER_NAME
@@ -657,13 +657,13 @@ shm_size() {
     if (( $# != 1 )); then
         msg red "Please specify a size, such as ./run.sh shm_size 64G"
     fi
-    msg green " -> Setting /dev/shm to $1"
+    msgts green " -> Setting /dev/shm to $1"
     sudo mount -o remount,size=$1 /dev/shm
     if [[ $? -eq 0 ]]; then
-        msg bold green "Successfully resized /dev/shm"
+        msgts bold green "Successfully resized /dev/shm"
     else
-        msg bold red "An error occurred while resizing /dev/shm..."
-        msg red "Make sure to specify size correctly, e.g. 64G. You can also try using sudo to run this."
+        msgts bold red "An error occurred while resizing /dev/shm..."
+        msgts red "Make sure to specify size correctly, e.g. 64G. You can also try using sudo to run this."
     fi
 }
 
@@ -672,17 +672,17 @@ shm_size() {
 # configuration, e.g. replay command line options
 #
 stop() {
-    msg "If you don't care about a clean stop, you can force stop the container with ${BOLD}./run.sh kill"
-    msg red "Stopping container '${DOCKER_NAME}' (allowing up to ${STOP_TIME} seconds before killing)..."
+    msgts "If you don't care about a clean stop, you can force stop the container with ${BOLD}./run.sh kill"
+    msgts red "Stopping container '${DOCKER_NAME}' (allowing up to ${STOP_TIME} seconds before killing)..."
     docker stop -t ${STOP_TIME} $DOCKER_NAME
-    msg red "Removing old container '${DOCKER_NAME}'..."
+    msgts red "Removing old container '${DOCKER_NAME}'..."
     docker rm $DOCKER_NAME
 }
 
 sbkill() {
-    msg bold red "Killing container '${DOCKER_NAME}'..."
+    msgts bold red "Killing container '${DOCKER_NAME}'..."
     docker kill "$DOCKER_NAME"
-    msg red "Removing container ${DOCKER_NAME}"
+    msgts red "Removing container ${DOCKER_NAME}"
     docker rm "$DOCKER_NAME"
 }
 
@@ -744,12 +744,7 @@ logs() {
 #   example:    2018-12-08T23:47:16    22.2312%   6300000 of 28338603   (60052M free)
 #
 pclogs() {
-    if [[ ! $(command -v jq) ]]; then
-        msg red "jq not found. Attempting to install..."
-        sleep 3
-        sudo apt-get update -y > /dev/null
-        sudo apt-get install -y jq > /dev/null
-    fi
+    pkg_not_found jq jq
     local LOG_PATH=$(docker inspect $DOCKER_NAME | jq -r .[0].LogPath)
     local pipe=/tmp/dkpipepc.fifo
     trap "rm -f $pipe" EXIT
@@ -792,12 +787,7 @@ pclogs() {
 #                   on block 28398481 by someguy123 -- Block Time Offset: -345 ms
 #
 tslogs() {
-    if [[ ! $(command -v jq) ]]; then
-        msg red "jq not found. Attempting to install..."
-        sleep 3
-        sudo apt update
-        sudo apt install -y jq
-    fi
+    pkg_not_found jq jq
     local LOG_PATH=$(docker inspect $DOCKER_NAME | jq -r .[0].LogPath)
     local pipe=/tmp/dkpipe.fifo
     trap "rm -f $pipe" EXIT
@@ -1033,25 +1023,25 @@ sb_clean() {
     if (( $# == 1 )); then
         case $1 in
             sh*)
-                msg bold red " !!! Clearing all files in SHM_DIR ( $SHM_DIR )"
+                msgts bold red " !!! Clearing all files in SHM_DIR ( $SHM_DIR )"
                 rm -rfv "$SHM_DIR"/*
                 mkdir -p "$SHM_DIR" &> /dev/null
-                msg bold green " +++ Cleared shared files directory."
+                msgts bold green " +++ Cleared shared files directory."
                 ;;
             bloc*)
-                msg bold red " !!! Clearing all files in $bc_dir and $p2p_dir"
+                msgts bold red " !!! Clearing all files in $bc_dir and $p2p_dir"
                 rm -rfv "$bc_dir"/*
                 rm -rfv "$p2p_dir"/*
                 mkdir -p "$bc_dir" "$p2p_dir" &> /dev/null
-                msg bold green " +++ Cleared blockchain files + p2p"
+                msgts bold green " +++ Cleared blockchain files + p2p"
                 ;;
             all)
-                msg bold red " !!! Clearing blockchain, p2p, and shared memory files..."
+                msgts bold red " !!! Clearing blockchain, p2p, and shared memory files..."
                 rm -rfv "$SHM_DIR"/*
                 rm -rfv "$bc_dir"/*
                 rm -rfv "$p2p_dir"/*
                 mkdir -p "$bc_dir" "$p2p_dir" "$SHM_DIR" &> /dev/null
-                msg bold green " +++ Cleared blockchain + p2p + shared memory"
+                msgts bold green " +++ Cleared blockchain + p2p + shared memory"
                 ;;
             *)
                 msg bold red " !!! Invalid option. Either run './run.sh clean' for interactive mode, "
@@ -1069,36 +1059,144 @@ sb_clean() {
 
     read -p "Do you want to remove the blockchain files? (y/n) > " cleanblocks
     if [[ "$cleanblocks" == "y" ]]; then
-        msg bold red " !!! Clearing blockchain files..."
+        msgts bold red " !!! Clearing blockchain files..."
         rm -rvf "$bc_dir"/*
         mkdir -p "$bc_dir" &> /dev/null
-        msg bold green " +++ Cleared blockchain files"
+        msgts bold green " +++ Cleared blockchain files"
     else
-        msg yellow " >> Not clearing blockchain folder."
+        msgts yellow " >> Not clearing blockchain folder."
     fi
     
     read -p "Do you want to remove the p2p files? (y/n) > " cleanp2p
     if [[ "$cleanp2p" == "y" ]]; then
-        msg bold red " !!! Clearing p2p files..."
+        msgts bold red " !!! Clearing p2p files..."
         rm -rvf "$p2p_dir"/*
         mkdir -p "$p2p_dir" &> /dev/null
-        msg bold green " +++ Cleared p2p files"
+        msgts bold green " +++ Cleared p2p files"
     else
-        msg yellow " >> Not clearing p2p folder."
+        msgts yellow " >> Not clearing p2p folder."
     fi
     
     read -p "Do you want to remove the shared memory / rocksdb files? (y/n) > " cleanshm
     if [[ "$cleanshm" == "y" ]]; then
-        msg bold red " !!! Clearing shared memory files..."
+        msgts bold red " !!! Clearing shared memory files..."
         rm -rvf "$SHM_DIR"/*
         mkdir -p "$SHM_DIR" &> /dev/null
-        msg bold green " +++ Cleared shared memory files"
+        msgts bold green " +++ Cleared shared memory files"
     else
-        msg yellow " >> Not clearing shared memory folder."
+        msgts yellow " >> Not clearing shared memory folder."
     fi
 
-    msg bold green " ++ Done."
+    msgts bold green " ++ Done."
 }
+
+err() {
+    printf "%s\n" "$*" >&2;
+}
+
+sb_debug() {
+    local LOG=$(mktemp) upload=0 auto=0
+    pkg_not_found nc netcat 
+    msg bold green "Outputting log to: $LOG"
+    while (( $# > 0 )); do
+        [[ "$1" == "upload" ]] && upload=1 && \
+                    msg bold green "Upload enabled. Will confirm upload request after generating logs"
+        [[ "$1" == "auto" ]] && auto=1 && \
+                    msg bold red "WARNING: Unattended mode enabled. Will generate log and upload it to termbin with no user interaction.\n" \
+                                 "If this is not what you want to do, you have 10 SECONDS to press CTRL-C to abort." && sleep 10
+        shift
+    done
+
+    {
+        msg "Date Checked: $(date)"
+        err "Reading your config ($CONF_LOCATION) and redacting private key..."
+        CONFDATA=$(sed -e "s/private-key = .*/private-key = 5xxxxxxxxxxxxxxx/" "$CONF_LOCATION")
+        msg " --- CONFIG FILE @ $CONF_LOCATION --- "
+        cat <<< "$CONFDATA"
+        msg " --- END CONFIG --- "
+        err "Checking git status of your SIAB install"
+        msg "--- Git Status: ---"
+        git status
+        err "Listing files inside of '$DIR' '$BCDIR' and '$SHM_DIR'"
+        msg "--- All files in DIR: $DIR ---"
+        ls -lah "$DIR"
+        msg "--- All files in BCDIR: $BCDIR ---"
+        ls -lah "$BCDIR"
+        msg "--- END BCDIR FILES ---\n\n"
+        msg "--- All files in SHM_DIR: $SHM_DIR --- "
+        ls -lah "$SHM_DIR"
+        msg "--- END SHM_DIR FILES ---\n\n"
+    } >> "$LOG"
+
+    {
+        err "Checking memory usage"
+        msg " --- FREE MEMORY / USAGE --- "
+        free -m
+        msg " --- END MEMORY --- \n\n"
+
+        err "Checking /dev/shm and disk space usage"
+        msg " --- FREE DISK/SHM PLUS USAGE --- "
+        df -h
+        msg " --- END DISK/SHM --- \n\n"
+        err "Scanning for OS version, SIAB version information, Docker containers + Images, and Docker version"
+        msg " ------ VERSION INFORMATION -----"
+        uname -a
+        cat /etc/lsb-release
+        P=$(pwd)
+        cd "$DIR"
+        msg "SIAB GIT STATUS:"
+        git status
+        git log | head -n 15
+        msg "DOCKER IMAGES:"
+        docker images
+        msg "RUNNING CONTAINERS:"
+        docker ps -a >> "$LOG"
+        msg "DOCKER VERSION:"
+        docker -v
+        cd "$P"
+        msg " --- END VERSION INFO --- \n\n"
+        err "Dumping all environment variables (will attempt to filter out any that may contain passwords)"
+        printenv | grep -Evi "_pass|_pwd|unlock|_key"
+    } >> "$LOG"
+
+    msg green "Log has been outputted to $LOG"
+    msg green "Use 'cat $LOG' or 'nano $LOG' to view the log data"
+    if (( $auto == 1 )); then
+      msg bold green "Uploading log '$LOG' to termbin in 10 seconds. Press CTRL-C to cancel."
+      sleep 10
+      cat "$LOG" | nc termbin.com 9999
+      msg green "Please give the above link to the person helping you. You can look at it in your browser if you'd like to make sure there's no personal information"
+      msg green "Debug log completed. Exiting now."
+      return 0
+    fi
+    if (( $upload != 1 )); then
+      msg yellow "Did not request upload (use '$0 debug upload' if you want to upload after dumping log)"
+      msg green "Debug log completed. Exiting now."
+      return 0
+    fi
+    while true; do
+      echo
+      read -p "Do you want to upload the log to termbin? (y)es/(e)dit/(n)o) > " yn
+      case $yn in
+        [Yy]* )
+          msg bold green "Uploading log '$LOG' to termbin"
+          cat "$LOG" | nc termbin.com 9999
+          msg green "Please give the above link to the person helping you. You can look at it in your browser if you'd like to make sure there's no personal information"
+          break;;
+        [Ee]* )
+          msg "Opening $LOG in editor 'nano'"
+          nano "$LOG"
+          msg yellow "Looks like you finished editing, or you're happy with the file."
+          ;;
+        [Nn]* )
+          exit 1
+          break;;
+        * ) msg red "Please answer yes (y), edit (e), or no (n).";;
+      esac
+    done
+    msg green "Debug log completed. Exiting now."
+}
+
 
 if [ "$#" -lt 1 ]; then
     help
@@ -1156,6 +1254,9 @@ case $1 in
         ;;
     setup)
         setup
+        ;;
+    debug)
+        sb_debug
         ;;
     optimize)
         msg "Applying recommended dirty write settings..."

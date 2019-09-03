@@ -26,11 +26,12 @@ function msg () {
         echo -e "$1"
         return
     fi
+    [[ "$1" == "ts" ]] && shift && _msg="[$(date +'%Y-%m-%d %H:%M:%S %Z')] " || _msg=""
     if [[ "$#" -gt 2 ]] && [[ "$1" == "bold" ]]; then
         echo -n "${BOLD}"
         shift
     fi
-    _msg="[$(date +'%Y-%m-%d %H:%M:%S %Z')] ${@:2}"
+    _msg+="${@:2}"
     case "$1" in
         bold) echo -e "${BOLD}${_msg}${RESET}";;
         [Bb]*) echo -e "${BLUE}${_msg}${RESET}";;
@@ -41,7 +42,12 @@ function msg () {
     esac
 }
 
-export -f msg
+# Alias for 'msg' function with timestamp on the left.
+function msgts () {
+    msg ts "${@:1}"
+}
+
+export -f msg msgx
 export RED GREEN YELLOW BLUE BOLD NORMAL RESET
 
 
