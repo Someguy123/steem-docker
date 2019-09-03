@@ -1109,9 +1109,9 @@ sb_debug() {
 
     {
         msg "Date Checked: $(date)"
-        err "Reading your config ($CONF_LOCATION) and redacting private key..."
-        CONFDATA=$(sed -e "s/private-key = .*/private-key = 5xxxxxxxxxxxxxxx/" "$CONF_LOCATION")
-        msg " --- CONFIG FILE @ $CONF_LOCATION --- "
+        err "Reading your config ($CONF_FILE) and redacting private key..."
+        CONFDATA=$(sed -e "s/private-key = .*/private-key = 5xxxxxxxxxxxxxxx/" "$CONF_FILE")
+        msg " --- CONFIG FILE @ $CONF_FILE --- "
         cat <<< "$CONFDATA"
         msg " --- END CONFIG --- "
         err "Checking git status of your SIAB install"
