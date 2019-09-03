@@ -10,6 +10,9 @@
 # Some parts copied from elsewhere e.g. StackOverflow - but often improved by Someguy123
 #
 #####################
+# Used by dependant scripts to check if this file has already been sourced
+# e.g.    [ -z ${SRCED_00HLP+x} ] && source "$DIR/000_helpers.sh"
+export SRCED_00HLP=1
 
 BOLD="$(tput bold)" RED="$(tput setaf 1)" GREEN="$(tput setaf 2)" YELLOW="$(tput setaf 3)" BLUE="$(tput setaf 4)" 
 MAGENTA="$(tput setaf 5)" CYAN="$(tput setaf 6)" WHITE="$(tput setaf 7)" RESET="$(tput sgr0)"

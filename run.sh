@@ -133,9 +133,10 @@ for i in $PORTS; do
     fi
 done
 
+# various helper functions such as 'msg', 'pkg_not_found', 'yesno' and 'containsElement'
+source "${DIR}/scripts/000_helpers.sh"
 # load docker hub API
-source "${DIR}/scripts/000_docker.sh"
-source "${DIR}/scripts/helpers.sh"
+source "${DIR}/scripts/010_docker.sh"
 
 
 help() {
@@ -922,7 +923,11 @@ ver() {
         echo "    $dkimg_output"
         got_dkimg=1
         echo "${BLUE}Checking for updates...${RESET}"
-        remote_docker_id="$(get_latest_id)"
+
+        # Using the function `get_latest_id` - obtain the latest SHA256 sum from Docker Hub for the image we use
+        (( $MIRA == 1 )) && rmt_tag='latest-mira' || rmt_tag='latest'
+        remote_docker_id="$(get_latest_id 'someguy123/steem' $rmt_tag)"
+
         if [[ "$?" == 0 ]]; then
             remote_docker_id="${remote_docker_id:7:12}"
             if [[ "$remote_docker_id" != "$dkimg_id" ]]; then
