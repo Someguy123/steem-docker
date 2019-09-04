@@ -6,3 +6,5 @@ data/witness_node_data_dir/database.cfg
 .env
 data/advanced_benchmark.json
 data/r_advanced_benchmark.json
+rocksdb*
+
