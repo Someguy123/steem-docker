@@ -1073,6 +1073,56 @@ sb_clean() {
     msg bold green " ++ Done."
 }
 
+# For use by @someguy123 for generating binary images
+# ./run.sh publish [mira|nomira] [version] (extratag def: latest)
+# e.g. ./run.sh publish mira v0.22.1
+# e.g. ./run.sh publish nomira some-branch-fix v0.22.1-fixed
+#
+# disable extra tag:
+# e.g. ./run.sh publish nomira some-branch-fix n/a
+#
+publish() {
+    if (( $# < 2 )); then
+        msg green "Usage: $0 publish [mira|nomira] [version] (extratag def: latest)"
+        return 1
+    fi
+    MKMIRA="$1"
+    BUILD_OPTS=()
+    case "$MKMIRA" in
+        mira)
+            BUILD_OPTS+=("ENABLE_MIRA=ON")
+            ;;
+        nomira)
+            BUILD_OPTS+=("ENABLE_MIRA=OFF")
+            ;;
+        *)
+            msg red "Invalid 1st argument for publish"
+            msg green "Usage: $0 publish [mira|nomira] [version] (extratag def: latest)"
+            return 1
+            ;;
+    esac
+
+    V="$2"
+
+    MAIN_TAG="someguy123/steem:$V"
+    [[ "$MKMIRA" == "mira" ]] && SECTAG="latest-mira" || SECTAG="latest"
+    (( $# > 2 )) && SECTAG="$3"
+    if [[ "$SECTAG" == "n/a" ]]; then
+        msg bold yellow  " >> Will build tag $V as tags $MAIN_TAG (no second tag)"
+    else
+        SECOND_TAG="someguy123/steem:$SECTAG"
+        msg bold yellow " >> Will build tag $V as tags $MAIN_TAG and $SECOND_TAG"
+    fi
+    sleep 5
+    ./run.sh build "$V" tag "$MAIN_TAG" "${BUILD_OPTS[@]}"
+    [[ "$SECTAG" != "n/a" ]] && docker tag "$MAIN_TAG" "$SECOND_TAG"
+    docker push "$MAIN_TAG"
+    [[ "$SECTAG" != "n/a" ]] && docker push "$SECOND_TAG"
+
+    msg bold green " >> Finished"
+}
+
+
 if [ "$#" -lt 1 ]; then
     help
 fi
@@ -1094,6 +1144,9 @@ case $1 in
         ;;
     install_full)
         install_full
+        ;;
+    publish)
+        publish "${@:2}"
         ;;
     start)
         start
