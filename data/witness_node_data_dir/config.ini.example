@@ -23,7 +23,7 @@ flush = 100000
 
 # P2P nodes to connect to on startup (may specify multiple times)
 p2p-seed-node = anyx.io:2001                        # @anyx (CA)
-#p2p-seed-node = gtg.steem.house:2001                # @gtg (PL)
+p2p-seed-node = gtg.steem.house:2001                # @gtg (PL)
 #p2p-seed-node = 5.9.18.213:2001                     # @pfunk (DE)
 p2p-seed-node = lafonasteem.com:2001                # @lafona (FR)
 p2p-seed-node = seed.roelandp.nl:2001               # @roelandp (FI)
@@ -36,8 +36,6 @@ p2p-seed-node = steem-seed.lukestokes.info:2001     # @lukestokes (SE)
 p2p-seed-node = node.mahdiyari.info:2001            # @mahdiyari (FI)
 p2p-seed-node = steemseed-fin.privex.io:2001        # @privex (FI)
 p2p-seed-node = steemseed-se.privex.io:2001         # @privex (SE)
-#p2p-seed-node = 46.105.121.158:1776                 # pressure (FR)
-p2p-seed-node = 188.165.249.111:1776                # mirabelle (FR)
 p2p-seed-node = seed.steemmonsters.com:2001         # @aggroed (SE)
 
 
