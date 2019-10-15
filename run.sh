@@ -1103,8 +1103,8 @@ publish() {
     esac
 
     V="$2"
-
-    MAIN_TAG="someguy123/steem:$V"
+    
+    : ${MAIN_TAG="someguy123/steem:$V"}
     [[ "$MKMIRA" == "mira" ]] && SECTAG="latest-mira" || SECTAG="latest"
     (( $# > 2 )) && SECTAG="$3"
     if [[ "$SECTAG" == "n/a" ]]; then
