@@ -9,13 +9,44 @@ RUN apt-get update && \
     apt-get install -y gcc g++ cmake make libbz2-dev libdb++-dev libdb-dev && \
     apt-get install -y libssl-dev openssl libreadline-dev autoconf libtool git gdb liblz4-tool wget jq virtualenv libgflags-dev libsnappy-dev zlib1g-dev libbz2-dev liblz4-dev libzstd-dev && \
     apt-get install -y autotools-dev build-essential libbz2-dev libicu-dev python-dev wget doxygen python3 python3-dev python3-pip libboost-all-dev curl && \
-    apt-get clean -qy && \
-    pip3 install jinja2
+    apt-get clean -qy
 
-ARG steemd_version=20190717-testnet
+RUN pip3 install jinja2
+
+###
+# Overridable build arguments
+# Can override during docker build using '--build-arg' like so:
+#
+#   docker build --build-arg "ENABLE_MIRA=OFF" --build-arg="STEEM_STATIC_BUILD=OFF" -t steem
+#
+###
+
+ARG steemd_version=master
+ENV steemd_version ${steemd_version}
 
 ARG STEEM_STATIC_BUILD=ON
 ENV STEEM_STATIC_BUILD ${STEEM_STATIC_BUILD}
+
+ARG ENABLE_MIRA=ON
+ENV ENABLE_MIRA ${ENABLE_MIRA}
+
+ARG LOW_MEMORY_MODE=ON
+ENV LOW_MEMORY_MODE ${LOW_MEMORY_MODE}
+
+ARG CLEAR_VOTES=ON
+ENV CLEAR_VOTES ${CLEAR_VOTES}
+
+ARG SKIP_BY_TX_ID=ON
+ENV SKIP_BY_TX_ID ${SKIP_BY_TX_ID}
+
+ARG BUILD_STEEM_TESTNET=ON
+ENV BUILD_STEEM_TESTNET ${BUILD_STEEM_TESTNET}
+
+ARG ENABLE_SMT_SUPPORT=ON
+ENV ENABLE_SMT_SUPPORT ${ENABLE_SMT_SUPPORT}
+
+ARG STEEM_LINT_LEVEL=OFF
+ENV STEEM_LINT_LEVEL ${STEEM_LINT_LEVEL}
 
 RUN cd ~ && \
 	git clone https://github.com/steemit/steem.git && \
@@ -23,17 +54,16 @@ RUN cd ~ && \
 	git checkout ${steemd_version} && \
 	git submodule update --init --recursive && \
     cd ~/steem && \
-    cmake \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_STEEM_TESTNET=ON \
-        -DENABLE_SMT_SUPPORT=ON \
-        -DLOW_MEMORY_NODE=ON \
-        -DCHAINBASE_CHECK_LOCKING=ON \
-        -DSTEEM_STATIC_BUILD=${STEEM_STATIC_BUILD} \
-        -DCLEAR_VOTES=ON \
-        -DSKIP_BY_TX_ID=ON \
-        -DSTEEM_LINT_LEVEL=OFF \
-        . && \
+	cmake -DCMAKE_BUILD_TYPE=Release . \
+            -DBUILD_STEEM_TESTNET=${BUILD_STEEM_TESTNET} \
+            -DENABLE_SMT_SUPPORT=${ENABLE_SMT_SUPPORT} \
+            -DLOW_MEMORY_NODE=${LOW_MEMORY_MODE} \
+            -DCHAINBASE_CHECK_LOCKING=ON \
+            -DCLEAR_VOTES=${CLEAR_VOTES} \
+            -DSTEEM_STATIC_BUILD=${STEEM_STATIC_BUILD} \
+            -DSKIP_BY_TX_ID=${SKIP_BY_TX_ID} \
+            -DSTEEM_LINT_LEVEL=${STEEM_LINT_LEVEL} \
+            -DENABLE_MIRA=${ENABLE_MIRA} && \
 	make -j$(nproc) && make install && rm -rf ~/steem
 VOLUME /steem
 WORKDIR /steem
@@ -45,6 +75,17 @@ EXPOSE 5000
 EXPOSE 8090
 EXPOSE 8091
 
+ARG STEEMD_BIN="/usr/local/bin/steemd"
+ENV STEEMD_BIN ${STEEMD_BIN}
+
+RUN echo "This container has been built with the following options:" >> /steem_build.txt && \
+    echo "----\nsteemit/steem version/commit: ${steemd_version}\n----" >> /steem_build.txt && \
+    echo "Default steemd executable: ${STEEMD_BIN}\n----" >> /steem_build.txt && \
+    echo "LOW_MEMORY_MODE=${LOW_MEMORY_MODE}\nSTEEM_STATIC_BUILD=${STEEM_STATIC_BUILD}" >> /steem_build.txt && \
+    echo "SKIP_BY_TX_ID=${SKIP_BY_TX_ID}\nENABLE_MIRA=${ENABLE_MIRA}\nCLEAR_VOTES=${CLEAR_VOTES}" >> /steem_build.txt && \
+    echo "----\nBuilt at: $(date)\n----" >> /steem_build.txt
+
 RUN echo "Please configure me! You need to mount a data directory onto /steem of this container to it to function correctly. (if you're using Steem-in-a-box most of this is handled automatically)"
-CMD ["sh", "-c", "/usr/local/bin/steemd"]
+CMD ["sh", "-c", "${STEEMD_BIN}"]
+
 

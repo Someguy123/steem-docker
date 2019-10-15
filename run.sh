@@ -46,6 +46,23 @@ RESET="$(tput sgr0)"
 # default. override in .env
 : ${PORTS="2201"}
 
+# Internal variable. Set to 1 by build_full to inform child functions
+BUILD_FULL=0
+# Placeholder for custom tag var CUST_TAG (shared between functions)
+CUST_TAG="steem"
+# Placeholder for BUILD_VER shared between functions
+BUILD_VER=""
+
+# Array of additional arguments to be passed to Docker during builds
+# Generally populated using arguments passed to build/build_full
+# But you can specify custom additional build parameters by setting BUILD_ARGS
+# as an array in .env
+# e.g.
+#
+#    BUILD_ARGS=('--rm' '-q' '--compress')
+#
+BUILD_ARGS=()
+
 # easy coloured messages function
 # written by @someguy123
 function msg () {
@@ -133,6 +150,7 @@ help() {
     echo
     echo "Commands: 
     start - starts steem container
+    clean - Remove blockchain, p2p, and/or shared mem folder contents (warns beforehand)
     dlblocks - download and decompress the blockchain to speed up your first start
     replay - starts steem container (in replay mode)
     memory_replay - starts steem container (in replay mode, with --memory-replay)
@@ -184,19 +202,60 @@ optimize() {
     echo 30000 | sudo tee /proc/sys/vm/dirty_writeback_centisecs
 }
 
+parse_build_args() {
+    BUILD_VER=$1
+    CUST_TAG="steem:$BUILD_VER"
+    if (( $BUILD_FULL == 1 )); then
+        CUST_TAG+="-full"
+    fi
+    BUILD_ARGS+=('--build-arg' "steemd_version=${BUILD_VER}")
+    shift
+    if (( $# >= 2 )); then
+        if [[ "$1" == "tag" ]]; then
+            CUST_TAG="$2"
+            msg yellow " >> Custom re-tag specified. Will tag new image with '${CUST_TAG}'"
+            shift; shift;    # Get rid of the two tag arguments. Everything after is now build args
+        fi
+    fi
+    if (( $# >= 1 )); then
+        msg yellow " >> Additional build arguments specified."
+        for a in "$@"; do
+            msg yellow " ++ Build argument: ${BOLD}${a}"
+            BUILD_ARGS+=('--build-arg' "$a")
+        done
+    fi
+    msg blue " ++ CUSTOM BUILD SPECIFIED. Building from branch/tag ${BOLD}${BUILD_VER}"
+    msg blue " ++ Tagging final image as: ${BOLD}${CUST_TAG}"
+    msg yellow " -> Docker build arguments: ${BOLD}${BUILD_ARGS[@]}"
+}
+
 # Build standard low memory node as a docker image
-# Usage: ./run.sh build [version]
+# Usage: ./run.sh build [version] [tag tag_name] [build_args]
 # Version is prefixed with v, matching steem releases
 # e.g. build v0.20.6
+#
+# Override destination tag:
+#   ./run.sh build v0.21.0 tag 'steem:latest'
+#
+# Additional build args:
+#   ./run.sh build v0.21.0 ENABLE_MIRA=OFF
+#
+# Or combine both:
+#   ./run.sh build v0.21.0 tag 'steem:mira' ENABLE_MIRA=ON
+#
 build() {
-    if (( $# == 1 )); then
-        BUILD_VER=$1
-        echo "${BLUE}CUSTOM BUILD SPECIFIED. Building from branch/tag ${BUILD_VER}${RESET}"
+    fmm="Low Memory Mode (For Seed / Witness nodes)"
+    (( $BUILD_FULL == 1 )) && fmm="Full Memory Mode (For RPC nodes)" && DOCKER_DIR="$FULL_DOCKER_DIR"
+    BUILD_MSG=" >> Building docker container [[ ${fmm} ]]"
+    if (( $# >= 1 )); then
+        parse_build_args "$@"
         sleep 2
-        cd $DOCKER_DIR
-        CUST_TAG="steem:$BUILD_VER"
-        docker build --build-arg "steemd_version=$BUILD_VER" -t "$CUST_TAG" .
-        echo "${RED}
+        cd "$DOCKER_DIR"
+        msg bold green "$BUILD_MSG"
+        docker build "${BUILD_ARGS[@]}" -t "$CUST_TAG" .
+        ret=$?
+        if (( $ret == 0 )); then
+            echo "${RED}
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
         For your safety, we've tagged this image as $CUST_TAG
@@ -207,12 +266,30 @@ build() {
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
         ${RESET}
-        "
+            "
+            msg bold green " +++ Successfully built steemd"
+            msg green " +++ Steem node type: ${BOLD}${fmm}"
+            msg green " +++ Version/Branch: ${BOLD}${BUILD_VER}"
+            msg green " +++ Build args: ${BOLD}${BUILD_ARGS[@]}"
+            msg green " +++ Docker tag: ${CUST_TAG}"
+        else
+            msg bold red " !!! ERROR: Something went wrong during the build process."
+            msg red " !!! Please scroll up and check for any error output during the build."
+        fi
         return
     fi
-    echo $GREEN"Building docker container"$RESET
-    cd $DOCKER_DIR
+    msg bold green "$BUILD_MSG"
+    cd "$DOCKER_DIR"
     docker build -t "$DOCKER_IMAGE" .
+    ret=$?
+    if (( $ret == 0 )); then
+        msg bold green " +++ Successfully built current stable steemd"
+        msg green " +++ Steem node type: ${BOLD}${fmm}"
+        msg green " +++ Docker tag: ${DOCKER_IMAGE}"
+    else
+        msg bold red " !!! ERROR: Something went wrong during the build process."
+        msg red " !!! Please scroll up and check for any error output during the build."
+    fi
 }
 
 # Build full memory node (for RPC nodes) as a docker image
@@ -220,30 +297,8 @@ build() {
 # Version is prefixed with v, matching steem releases
 # e.g. build_full v0.20.6
 build_full() {
-    if (( $# == 1 )); then
-        BUILD_VER=$1
-        echo $BLUE"CUSTOM (FULL NODE) BUILD SPECIFIED. Building from branch/tag $BUILD_VER"$RESET
-        sleep 2
-        cd $FULL_DOCKER_DIR
-        CUST_TAG="steem:$BUILD_VER-full"
-        docker build --build-arg "steemd_version=$BUILD_VER" -t "$CUST_TAG" .
-        echo "${RED}
-    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
-    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
-        For your safety, we've tagged this image as $CUST_TAG
-        To use it in this steem-docker, run: 
-        ${GREEN}${BOLD}
-        docker tag $CUST_TAG steem:latest
-        ${RESET}${RED}
-    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
-    !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
-        ${RESET}
-        "
-        return
-    fi
-    echo $GREEN"Building full-node docker container"$RESET
-    cd $FULL_DOCKER_DIR
-    docker build -t "$DOCKER_IMAGE" .
+    BUILD_FULL=1
+    build "$@"
 }
 
 # Usage: ./run.sh dlblocks [override_dlmethod] [url] [compress]
@@ -449,6 +504,16 @@ install_docker() {
 install() {
     if (( $# == 1 )); then
         DK_TAG=$1
+        # If neither '/' nor ':' are present in the tag, then for convenience, assume that the user wants
+        # someguy123/steem with this specific tag.
+        if grep -qv ':' <<< "$1"; then
+            if grep -qv '/' <<< "$1"; then
+                msg bold red "WARNING: Neither / nor : were present in your tag '$1'"
+                DK_TAG="someguy123/steem:$1"
+                msg red "We're assuming you've entered a version, and will try to install @someguy123's image: '${DK_TAG}'"
+                msg yellow "If you *really* specifically want '$1' from Docker hub, set DK_TAG='$1' inside of .env and run './run.sh install'"
+            fi
+        fi
     fi
     msg bold red "NOTE: You are installing image $DK_TAG. Please make sure this is correct."
     sleep 2
@@ -670,14 +735,14 @@ pclogs() {
     fi
     # the sleep is a dirty hack to keep the pipe open
 
-    sleep 10000 < $pipe &
+    sleep 1000000 < $pipe &
     tail -n 5000 -f "$LOG_PATH" &> $pipe &
     while true
     do
         if read -r line <$pipe; then
             # first grep the data for "objects cached" to avoid
             # needlessly processing the data
-            L=$(grep --colour=never "objects cached" <<< "$line")
+            L=$(egrep --colour=never "objects cached|M free" <<< "$line")
             if [[ $? -ne 0 ]]; then
                 continue
             fi
@@ -758,7 +823,7 @@ simplecommitlog() {
         count="$2"
         args="-n $count $args"
     fi
-    git log --pretty=format:"$commit_format" $args
+    git --no-pager log --pretty=format:"$commit_format" $args
 }
 
 
@@ -805,7 +870,7 @@ ver() {
     echo
     echo
     # Check for updates and let user know what's new
-    if grep -q "up-to-date" <<< "$git_update"; then
+    if grep -Eiq "up.to.date" <<< "$git_update"; then
         echo "    ${GREEN}Your steem-in-a-box core files (run.sh, Dockerfile etc.) up to date${RESET}"
     else
         echo "    ${RED}Your steem-in-a-box core files (run.sh, Dockerfile etc.) are outdated!${RESET}"
@@ -829,7 +894,7 @@ ver() {
     # Used later on, for commands that depend on the image existing
     got_dkimg=0
     if [[ $(wc -c <<< "$dkimg_output") -lt 10 ]]; then
-        echo "${RED}WARNING: We could not find the currently installed image (steem:lateset)${RESET}"
+        echo "${RED}WARNING: We could not find the currently installed image (${DOCKER_IMAGE})${RESET}"
         echo "${RED}Make sure it's installed with './run.sh install' or './run.sh build'${RESET}"
     else
         echo "    $dkimg_output"
@@ -855,6 +920,9 @@ ver() {
 
     echo $LINE
 
+    msg green "Build information for currently installed Steem image '${DOCKER_IMAGE}':"
+
+    docker run --rm -it "${DOCKER_IMAGE}" cat /steem_build.txt
 
     echo "${BLUE}Steem version currently running:${RESET}"
     # Verify that the container exists, even if it's stopped
@@ -911,6 +979,150 @@ status() {
 
 }
 
+# Usage: ./run.sh clean [blocks|shm|all]
+# Removes blockchain, p2p, and/or shared memory folder contents, with interactive prompts.
+#
+# To skip the "are you sure" prompt, specify either:
+#     'blocks' (clear blockchain+p2p)
+#     'shm' (SHM_DIR, usually /dev/shm)
+#     'all' (clear both of the above)
+#
+# Example (delete blockchain+p2p folder contents without asking first):
+#     ./run.sh clean blocks
+#
+sb_clean() {
+    bc_dir="${DATADIR}/witness_node_data_dir/blockchain"
+    p2p_dir="${DATADIR}/witness_node_data_dir/p2p"
+    
+    # To prevent the risk of glob problems due to non-existant folders,
+    # we re-create them silently before we touch them.
+    mkdir -p "$bc_dir" "$p2p_dir" "$SHM_DIR" &> /dev/null
+
+    msg yellow " :: Blockchain:           $bc_dir"
+    msg yellow " :: P2P files:            $p2p_dir"
+    msg yellow " :: Shared Mem / Rocksdb: $SHM_DIR"
+    msg
+    
+    if (( $# == 1 )); then
+        case $1 in
+            sh*)
+                msg bold red " !!! Clearing all files in SHM_DIR ( $SHM_DIR )"
+                rm -rfv "$SHM_DIR"/*
+                mkdir -p "$SHM_DIR" &> /dev/null
+                msg bold green " +++ Cleared shared files directory."
+                ;;
+            bloc*)
+                msg bold red " !!! Clearing all files in $bc_dir and $p2p_dir"
+                rm -rfv "$bc_dir"/*
+                rm -rfv "$p2p_dir"/*
+                mkdir -p "$bc_dir" "$p2p_dir" &> /dev/null
+                msg bold green " +++ Cleared blockchain files + p2p"
+                ;;
+            all)
+                msg bold red " !!! Clearing blockchain, p2p, and shared memory files..."
+                rm -rfv "$SHM_DIR"/*
+                rm -rfv "$bc_dir"/*
+                rm -rfv "$p2p_dir"/*
+                mkdir -p "$bc_dir" "$p2p_dir" "$SHM_DIR" &> /dev/null
+                msg bold green " +++ Cleared blockchain + p2p + shared memory"
+                ;;
+            *)
+                msg bold red " !!! Invalid option. Either run './run.sh clean' for interactive mode, "
+                msg bold red " !!!   or for automatic mode specify 'blocks' (blockchain + p2p), "
+                msg bold red " !!!   'shm' (shared memory/rocksdb) or 'all' (both blocks and shm)"
+                return 1
+                ;;
+        esac
+        return
+    fi
+
+    msg green " (+) To skip these prompts, you can run './run.sh clean' with 'blocks', 'shm', or 'all'"
+    msg green " (?) 'blocks' = blockchain + p2p folder, 'shm' = shared memory folder, 'all' = blocks + shm"
+    msg green " (?) Example: './run.sh clean blocks' will clear blockchain + p2p without any warnings."
+
+    read -p "Do you want to remove the blockchain files? (y/n) > " cleanblocks
+    if [[ "$cleanblocks" == "y" ]]; then
+        msg bold red " !!! Clearing blockchain files..."
+        rm -rvf "$bc_dir"/*
+        mkdir -p "$bc_dir" &> /dev/null
+        msg bold green " +++ Cleared blockchain files"
+    else
+        msg yellow " >> Not clearing blockchain folder."
+    fi
+    
+    read -p "Do you want to remove the p2p files? (y/n) > " cleanp2p
+    if [[ "$cleanp2p" == "y" ]]; then
+        msg bold red " !!! Clearing p2p files..."
+        rm -rvf "$p2p_dir"/*
+        mkdir -p "$p2p_dir" &> /dev/null
+        msg bold green " +++ Cleared p2p files"
+    else
+        msg yellow " >> Not clearing p2p folder."
+    fi
+    
+    read -p "Do you want to remove the shared memory / rocksdb files? (y/n) > " cleanshm
+    if [[ "$cleanshm" == "y" ]]; then
+        msg bold red " !!! Clearing shared memory files..."
+        rm -rvf "$SHM_DIR"/*
+        mkdir -p "$SHM_DIR" &> /dev/null
+        msg bold green " +++ Cleared shared memory files"
+    else
+        msg yellow " >> Not clearing shared memory folder."
+    fi
+
+    msg bold green " ++ Done."
+}
+
+# For use by @someguy123 for generating binary images
+# ./run.sh publish [mira|nomira] [version] (extratag def: latest)
+# e.g. ./run.sh publish mira v0.22.1
+# e.g. ./run.sh publish nomira some-branch-fix v0.22.1-fixed
+#
+# disable extra tag:
+# e.g. ./run.sh publish nomira some-branch-fix n/a
+#
+publish() {
+    if (( $# < 2 )); then
+        msg green "Usage: $0 publish [mira|nomira] [version] (extratag def: latest)"
+        return 1
+    fi
+    MKMIRA="$1"
+    BUILD_OPTS=()
+    case "$MKMIRA" in
+        mira)
+            BUILD_OPTS+=("ENABLE_MIRA=ON")
+            ;;
+        nomira)
+            BUILD_OPTS+=("ENABLE_MIRA=OFF")
+            ;;
+        *)
+            msg red "Invalid 1st argument for publish"
+            msg green "Usage: $0 publish [mira|nomira] [version] (extratag def: latest)"
+            return 1
+            ;;
+    esac
+
+    V="$2"
+
+    MAIN_TAG="someguy123/steem:$V"
+    [[ "$MKMIRA" == "mira" ]] && SECTAG="latest-mira" || SECTAG="latest"
+    (( $# > 2 )) && SECTAG="$3"
+    if [[ "$SECTAG" == "n/a" ]]; then
+        msg bold yellow  " >> Will build tag $V as tags $MAIN_TAG (no second tag)"
+    else
+        SECOND_TAG="someguy123/steem:$SECTAG"
+        msg bold yellow " >> Will build tag $V as tags $MAIN_TAG and $SECOND_TAG"
+    fi
+    sleep 5
+    ./run.sh build "$V" tag "$MAIN_TAG" "${BUILD_OPTS[@]}"
+    [[ "$SECTAG" != "n/a" ]] && docker tag "$MAIN_TAG" "$SECOND_TAG"
+    docker push "$MAIN_TAG"
+    [[ "$SECTAG" != "n/a" ]] && docker push "$SECOND_TAG"
+
+    msg bold green " >> Finished"
+}
+
+
 if [ "$#" -lt 1 ]; then
     help
 fi
@@ -932,6 +1144,9 @@ case $1 in
         ;;
     install_full)
         install_full
+        ;;
+    publish)
+        publish "${@:2}"
         ;;
     start)
         start
@@ -961,6 +1176,9 @@ case $1 in
         sleep 5
         build
         start
+        ;;
+    clean)
+        sb_clean "${@:2}"
         ;;
     optimize)
         msg "Applying recommended dirty write settings..."

@@ -2,7 +2,7 @@
 p2p-endpoint = 0.0.0.0:2201
 
 # Maxmimum number of incoming connections on P2P endpoint
-# p2p-max-connections =
+p2p-max-connections = 200
 
 # Shared file size
 shared-file-size = 10G
@@ -49,7 +49,7 @@ webserver-ws-endpoint = 0.0.0.0:8190
 # api-user =
 
 # Plugin(s) to enable, may be specified multiple times
-plugin = witness condenser_api network_broadcast_api rc_api account_by_key database_api
+plugin = witness condenser_api network_broadcast_api account_by_key database_api
 
 # Defines a range of accounts to track as a json pair ["from","to"] [from,to)
 # track-account-range =
