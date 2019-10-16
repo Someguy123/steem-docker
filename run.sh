@@ -1084,6 +1084,7 @@ sb_clean() {
 publish() {
     if (( $# < 2 )); then
         msg green "Usage: $0 publish [mira|nomira] [version] (extratag def: latest)"
+        msg yellow "Environment vars:\n\tMAIN_TAG - Override the primary tag (default: someguy123/steem:\$V)\n"
         return 1
     fi
     MKMIRA="$1"
