@@ -8,10 +8,11 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DOCKER_DIR="$DIR/dkr"}
 : ${FULL_DOCKER_DIR="$DIR/dkr_fullnode"}
 : ${DATADIR="$DIR/data"}
-: ${DOCKER_NAME="testnet"}
+# the name of the docker container for start/stop/replay etc. to use
+: ${DOCKER_NAME="steem-testnet"}
 
-# the tag to use when running/replaying steemd
-: ${DOCKER_IMAGE="testnet-hf21"}
+# the docker image tag to use for creating steem containers
+: ${DOCKER_IMAGE="steem-testnet"}
 
 
 # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
@@ -26,19 +27,16 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # a damaged/incomplete block_log. Set to "no" to disable rsync when resuming.
 : ${BC_RSYNC="rsync://files.privex.io/steem/block_log"}
 
-BOLD="$(tput bold)"
-RED="$(tput setaf 1)"
-GREEN="$(tput setaf 2)"
-YELLOW="$(tput setaf 3)"
-BLUE="$(tput setaf 4)"
-MAGENTA="$(tput setaf 5)"
-CYAN="$(tput setaf 6)"
-WHITE="$(tput setaf 7)"
-RESET="$(tput sgr0)"
-: ${DK_TAG="someguy123/steem:testnet-hf21"}
-: ${DK_TAG_FULL="someguy123/steem:testnet-hf21"}
+BOLD="$(tput bold)" RED="$(tput setaf 1)" GREEN="$(tput setaf 2)"
+YELLOW="$(tput setaf 3)" BLUE="$(tput setaf 4)" MAGENTA="$(tput setaf 5)"
+CYAN="$(tput setaf 6)" WHITE="$(tput setaf 7)" RESET="$(tput sgr0)"
+
+# Tags to use for downloading binary images (when using 'install')
+: ${DK_TAG="someguy123/steem:testnet"}
+: ${DK_TAG_FULL="someguy123/steem:testnet"}
 : ${SHM_DIR="/dev/shm"}
-: ${REMOTE_WS="wss://steemd.privex.io"}
+# Default 'remote_wallet' server
+: ${REMOTE_WS="ws://steemseed-fin.privex.io:8190"}
 # Amount of time in seconds to allow the docker container to stop before killing it.
 # Default: 600 seconds (10 minutes)
 : ${STOP_TIME=600}
@@ -261,7 +259,7 @@ build() {
         For your safety, we've tagged this image as $CUST_TAG
         To use it in this steem-docker, run: 
         ${GREEN}${BOLD}
-        docker tag $CUST_TAG steem:latest
+        docker tag $CUST_TAG $DOCKER_IMAGE
         ${RESET}${RED}
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
