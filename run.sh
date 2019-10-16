@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Steem node manager
 # Released under GNU AGPL by Someguy123
