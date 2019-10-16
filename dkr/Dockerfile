@@ -49,11 +49,9 @@ ARG STEEM_LINT_LEVEL=OFF
 ENV STEEM_LINT_LEVEL ${STEEM_LINT_LEVEL}
 
 RUN cd ~ && \
-	git clone https://github.com/steemit/steem.git && \
+	git clone https://github.com/steemit/steem.git -b ${steemd_version} && \
 	cd steem && \
-	git checkout ${steemd_version} && \
 	git submodule update --init --recursive && \
-    cd ~/steem && \
 	cmake -DCMAKE_BUILD_TYPE=Release . \
             -DBUILD_STEEM_TESTNET=${BUILD_STEEM_TESTNET} \
             -DENABLE_SMT_SUPPORT=${ENABLE_SMT_SUPPORT} \
