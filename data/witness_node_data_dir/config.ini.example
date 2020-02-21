@@ -22,9 +22,9 @@ shared-file-scale-rate = 1000
 flush = 100000
 
 # P2P nodes to connect to on startup (may specify multiple times)
-p2p-seed-node = 18.232.153.75:2002
-p2p-seed-node = 18.232.153.75:2001
-p2p-seed-node = 18.232.153.75:2000
+#p2p-seed-node = 18.232.153.75:2002   # node2 unpatched
+p2p-seed-node = 18.232.153.75:2001   # node1 patched
+p2p-seed-node = 18.232.153.75:2000   # initminer patched
 p2p-seed-node = steemseed-fin.privex.io:2301        # @privex (FI)
 
 
