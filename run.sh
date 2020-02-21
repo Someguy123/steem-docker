@@ -9,10 +9,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${FULL_DOCKER_DIR="$DIR/dkr_fullnode"}
 : ${DATADIR="$DIR/data"}
 # the name of the docker container for start/stop/replay etc. to use
-: ${DOCKER_NAME="steem-testnet"}
+: ${DOCKER_NAME="steem-testnet-newchain"}
 
 # the docker image tag to use for creating steem containers
-: ${DOCKER_IMAGE="steem-testnet"}
+: ${DOCKER_IMAGE="testnet-newchain"}
 
 
 # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
@@ -32,11 +32,11 @@ YELLOW="$(tput setaf 3)" BLUE="$(tput setaf 4)" MAGENTA="$(tput setaf 5)"
 CYAN="$(tput setaf 6)" WHITE="$(tput setaf 7)" RESET="$(tput sgr0)"
 
 # Tags to use for downloading binary images (when using 'install')
-: ${DK_TAG="someguy123/steem:testnet"}
-: ${DK_TAG_FULL="someguy123/steem:testnet"}
+: ${DK_TAG="someguy123/steem:testnet-newchain"}
+: ${DK_TAG_FULL="someguy123/steem:testnet-newchain"}
 : ${SHM_DIR="/dev/shm"}
 # Default 'remote_wallet' server
-: ${REMOTE_WS="ws://steemseed-fin.privex.io:8190"}
+: ${REMOTE_WS="ws://steemseed-fin.privex.io:8390"}
 # Amount of time in seconds to allow the docker container to stop before killing it.
 # Default: 600 seconds (10 minutes)
 : ${STOP_TIME=600}
@@ -45,12 +45,12 @@ CYAN="$(tput setaf 6)" WHITE="$(tput setaf 7)" RESET="$(tput sgr0)"
 : ${CHAIN_ID="b35b6a737cb2c30712c409d9343af59b56c90ee40b742b944eedaf25d9f168e8"}
 
 # default. override in .env
-: ${PORTS="2201"}
+: ${PORTS="2301"}
 
 # Internal variable. Set to 1 by build_full to inform child functions
 BUILD_FULL=0
 # Placeholder for custom tag var CUST_TAG (shared between functions)
-CUST_TAG="steem"
+CUST_TAG="testnet-newchain"
 # Placeholder for BUILD_VER shared between functions
 BUILD_VER=""
 
