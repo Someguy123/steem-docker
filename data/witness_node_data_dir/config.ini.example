@@ -34,8 +34,8 @@ p2p-seed-node = steemseed-fin.privex.io:2301        # @privex (FI)
 
 # Endpoint for websocket RPC to listen on
 
-webserver-http-endpoint = 0.0.0.0:8191
-webserver-ws-endpoint = 0.0.0.0:8190
+webserver-http-endpoint = 0.0.0.0:8391
+webserver-ws-endpoint = 0.0.0.0:8390
 
 # Endpoint for TLS websocket RPC to listen on
 # rpc-tls-endpoint =
