@@ -42,7 +42,7 @@ CYAN="$(tput setaf 6)" WHITE="$(tput setaf 7)" RESET="$(tput sgr0)"
 : ${STOP_TIME=600}
 
 # Chain ID to pass to steemd when launching with --chain-id argument
-: ${CHAIN_ID="46d82ab7d8db682eb1959aed0ada039a6d49afa1602491f93dde9cac3e8e6c32"}
+: ${CHAIN_ID="b35b6a737cb2c30712c409d9343af59b56c90ee40b742b944eedaf25d9f168e8"}
 
 # default. override in .env
 : ${PORTS="2201"}

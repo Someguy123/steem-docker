@@ -21,7 +21,7 @@ RUN pip3 install jinja2
 #
 ###
 
-ARG steemd_version=master
+ARG steemd_version=0.22.2
 ENV steemd_version ${steemd_version}
 
 ARG STEEM_STATIC_BUILD=ON
@@ -39,7 +39,7 @@ ENV CLEAR_VOTES ${CLEAR_VOTES}
 ARG SKIP_BY_TX_ID=ON
 ENV SKIP_BY_TX_ID ${SKIP_BY_TX_ID}
 
-ARG BUILD_STEEM_TESTNET=ON
+ARG BUILD_STEEM_TESTNET=On
 ENV BUILD_STEEM_TESTNET ${BUILD_STEEM_TESTNET}
 
 ARG ENABLE_SMT_SUPPORT=ON
@@ -49,7 +49,7 @@ ARG STEEM_LINT_LEVEL=OFF
 ENV STEEM_LINT_LEVEL ${STEEM_LINT_LEVEL}
 
 RUN cd ~ && \
-	git clone https://github.com/steemit/steem.git -b ${steemd_version} && \
+	git clone https://github.com/SteemDevs/steem -b ${steemd_version} && \
 	cd steem && \
 	git submodule update --init --recursive && \
 	cmake -DCMAKE_BUILD_TYPE=Release . \

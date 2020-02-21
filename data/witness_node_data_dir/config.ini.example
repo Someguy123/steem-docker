@@ -1,5 +1,5 @@
 # Endpoint for P2P node to listen on
-p2p-endpoint = 0.0.0.0:2201
+p2p-endpoint = 0.0.0.0:2301
 
 # Maxmimum number of incoming connections on P2P endpoint
 p2p-max-connections = 200
@@ -22,8 +22,12 @@ shared-file-scale-rate = 1000
 flush = 100000
 
 # P2P nodes to connect to on startup (may specify multiple times)
-p2p-seed-node = steemseed-fin.privex.io:2201        # @privex (FI)
-p2p-seed-node = testnet.steemitdev.com:2001         # @steemit
+p2p-seed-node = 18.232.153.75:2002
+p2p-seed-node = 18.232.153.75:2001
+p2p-seed-node = 18.232.153.75:2000
+p2p-seed-node = steemseed-fin.privex.io:2301        # @privex (FI)
+
+
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
 # checkpoint =
@@ -49,7 +53,9 @@ webserver-ws-endpoint = 0.0.0.0:8190
 # api-user =
 
 # Plugin(s) to enable, may be specified multiple times
-plugin = witness condenser_api network_broadcast_api account_by_key database_api
+#plugin = witness condenser_api network_broadcast_api account_by_key database_api
+backtrace = yes
+plugin = p2p witness database_api network_broadcast_api block_api condenser_api account_by_key
 
 # Defines a range of accounts to track as a json pair ["from","to"] [from,to)
 # track-account-range =
