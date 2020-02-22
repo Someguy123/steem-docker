@@ -20,7 +20,7 @@ ARG ENABLE_MIRA=ON
 ENV ENABLE_MIRA ${ENABLE_MIRA}
 
 RUN cd ~ && \
-	git clone https://github.com/steemit/steem.git && \
+	git clone https://github.com/SteemDevs/steem && \
 	cd steem && \
 	git checkout ${steemd_version} && \
 	git submodule update --init --recursive && \

@@ -40,7 +40,7 @@ ARG SKIP_BY_TX_ID=ON
 ENV SKIP_BY_TX_ID ${SKIP_BY_TX_ID}
 
 RUN cd ~ && \
-	git clone https://github.com/steemit/steem.git && \
+	git clone https://github.com/SteemDevs/steem && \
 	cd steem && \
 	git checkout ${steemd_version} && \
 	git submodule update --init --recursive && \
