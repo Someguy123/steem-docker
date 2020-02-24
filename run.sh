@@ -4,6 +4,19 @@
 # Released under GNU AGPL by Someguy123
 #
 
+
+# Error handling function for ShellCore
+_sc_fail() { >&2 echo "Failed to load or install Privex ShellCore..." && exit 1; }
+# If `load.sh` isn't found in the user install / global install, then download and run the auto-installer
+# from Privex's CDN.
+[[ -f "${HOME}/.pv-shcore/load.sh" ]] || [[ -f "/usr/local/share/pv-shcore/load.sh" ]] || \
+    { curl -fsS https://cdn.privex.io/github/shell-core/install.sh | bash >/dev/null; } || _sc_fail
+
+# Attempt to load the local install of ShellCore first, then fallback to global install if it's not found.
+[[ -d "${HOME}/.pv-shcore" ]] && source "${HOME}/.pv-shcore/load.sh" || \
+    source "/usr/local/share/pv-shcore/load.sh" || _sc_fail
+
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DOCKER_DIR="$DIR/dkr"}
 : ${FULL_DOCKER_DIR="$DIR/dkr_fullnode"}
@@ -43,7 +56,11 @@ RESET="$(tput sgr0)"
 # Default: 600 seconds (10 minutes)
 : ${STOP_TIME=600}
 
-# default. override in .env
+# Git repository to use when building Steem - containing steemd code
+: ${STEEM_SOURCE="https://github.com/steemit/steem.git"}
+
+# Comma separated list of ports to expose to the internet.
+# By default, only port 2001 will be exposed (the P2P seed port)
 : ${PORTS="2001"}
 
 # Internal variable. Set to 1 by build_full to inform child functions
@@ -52,6 +69,7 @@ BUILD_FULL=0
 CUST_TAG="steem"
 # Placeholder for BUILD_VER shared between functions
 BUILD_VER=""
+
 
 # Array of additional arguments to be passed to Docker during builds
 # Generally populated using arguments passed to build/build_full
@@ -138,7 +156,11 @@ IFS=","
 DPORTS=()
 for i in $PORTS; do
     if [[ $i != "" ]]; then
-	    DPORTS+=("-p0.0.0.0:$i:$i")
+        if grep -q ":" <<< "$i"; then
+            DPORTS+=("-p$i")
+        else
+            DPORTS+=("-p0.0.0.0:$i:$i")
+        fi
     fi
 done
 
@@ -217,13 +239,26 @@ parse_build_args() {
             shift; shift;    # Get rid of the two tag arguments. Everything after is now build args
         fi
     fi
+    local has_steem_src='n'
     if (( $# >= 1 )); then
         msg yellow " >> Additional build arguments specified."
         for a in "$@"; do
             msg yellow " ++ Build argument: ${BOLD}${a}"
             BUILD_ARGS+=('--build-arg' "$a")
+            if grep -q 'STEEM_SOURCE' <<< "$a"; then
+                has_steem_src='y'
+            fi
         done
     fi
+
+    if [[ "$has_steem_src" == "y" ]]; then
+        msg bold yellow " [!!] STEEM_SOURCE has been specified in the build arguments. Using source from build args instead of global"
+    else
+        msg bold yellow " [!!] Did not find STEEM_SOURCE in build args. Using STEEM_SOURCE from environment:"
+        msg bold yellow " [!!] STEEM_SOURCE = ${STEEM_SOURCE}"
+        BUILD_ARGS+=('--build-arg' "STEEM_SOURCE=${STEEM_SOURCE}")
+    fi
+    
     msg blue " ++ CUSTOM BUILD SPECIFIED. Building from branch/tag ${BOLD}${BUILD_VER}"
     msg blue " ++ Tagging final image as: ${BOLD}${CUST_TAG}"
     msg yellow " -> Docker build arguments: ${BOLD}${BUILD_ARGS[@]}"

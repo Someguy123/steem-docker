@@ -24,6 +24,9 @@ RUN pip3 install jinja2
 ARG steemd_version=stable
 ENV steemd_version ${steemd_version}
 
+ARG STEEM_SOURCE="https://github.com/steemit/steem.git"
+ENV STEEM_SOURCE ${STEEM_SOURCE}
+
 ARG STEEM_STATIC_BUILD=ON
 ENV STEEM_STATIC_BUILD ${STEEM_STATIC_BUILD}
 
@@ -40,9 +43,9 @@ ARG SKIP_BY_TX_ID=ON
 ENV SKIP_BY_TX_ID ${SKIP_BY_TX_ID}
 
 RUN cd ~ && \
-	git clone https://github.com/steemit/steem.git && \
+    echo " >>> Cloning tag/branch ${steemd_version} from repo: ${STEEM_SOURCE}" && \
+	git clone ${STEEM_SOURCE} steem -b ${steemd_version} && \
 	cd steem && \
-	git checkout ${steemd_version} && \
 	git submodule update --init --recursive && \
         cd ~/steem && \
 	cmake -DCMAKE_BUILD_TYPE=Release . \
@@ -66,8 +69,11 @@ ARG STEEMD_BIN="/usr/local/bin/steemd"
 ENV STEEMD_BIN ${STEEMD_BIN}
 
 RUN echo "This container has been built with the following options:" >> /steem_build.txt && \
-    echo "----\nsteemit/steem version/commit: ${steemd_version}\n----" >> /steem_build.txt && \
-    echo "Default steemd executable: ${STEEMD_BIN}\n----" >> /steem_build.txt && \
+    echo "----" >> /steem_build.txt && \
+    echo "Git Repository:              ${STEEM_SOURCE}" >> /steem_build.txt && \
+    echo "Git version/commit:          ${steemd_version}\n----" >> /steem_build.txt && \
+    echo "Default steemd executable:   ${STEEMD_BIN}\n---" >> /steem_build.txt && \
+    echo "--- CMake Config Options ---" >> /steem_build.txt && \
     echo "LOW_MEMORY_MODE=${LOW_MEMORY_MODE}\nSTEEM_STATIC_BUILD=${STEEM_STATIC_BUILD}" >> /steem_build.txt && \
     echo "SKIP_BY_TX_ID=${SKIP_BY_TX_ID}\nENABLE_MIRA=${ENABLE_MIRA}\nCLEAR_VOTES=${CLEAR_VOTES}" >> /steem_build.txt && \
     echo "----\nBuilt at: $(date)\n----" >> /steem_build.txt

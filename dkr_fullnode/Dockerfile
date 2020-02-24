@@ -13,6 +13,9 @@ RUN apt-get update && \
 
 ARG steemd_version=stable
 
+ARG STEEM_SOURCE="https://github.com/steemit/steem.git"
+ENV STEEM_SOURCE ${STEEM_SOURCE}
+
 ARG STEEM_STATIC_BUILD=ON
 ENV STEEM_STATIC_BUILD ${STEEM_STATIC_BUILD}
 
@@ -20,7 +23,7 @@ ARG ENABLE_MIRA=ON
 ENV ENABLE_MIRA ${ENABLE_MIRA}
 
 RUN cd ~ && \
-	git clone https://github.com/steemit/steem.git && \
+	git clone ${STEEM_SOURCE} steem && \
 	cd steem && \
 	git checkout ${steemd_version} && \
 	git submodule update --init --recursive && \
