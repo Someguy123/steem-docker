@@ -38,6 +38,8 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Anonymous rsync daemon URL to the raw block_log, for repairing/resuming
 # a damaged/incomplete block_log. Set to "no" to disable rsync when resuming.
 : ${BC_RSYNC="rsync://files.privex.io/steem/block_log"}
+# Rsync URL for MIRA RocksDB files
+: ${ROCKSDB_RSYNC="rsync://files.privex.io/steem/rocksdb/"}
 
 BOLD="$(tput bold)"
 RED="$(tput setaf 1)"
@@ -171,25 +173,35 @@ help() {
     echo "Usage: $0 COMMAND [DATA]"
     echo
     echo "Commands: 
-    start - starts steem container
-    clean - Remove blockchain, p2p, and/or shared mem folder contents (warns beforehand)
-    dlblocks - download and decompress the blockchain to speed up your first start
-    replay - starts steem container (in replay mode)
-    memory_replay - starts steem container (in replay mode, with --memory-replay)
-    shm_size - resizes /dev/shm to size given, e.g. ./run.sh shm_size 10G 
-    stop - stops steem container
-    status - show status of steem container
-    restart - restarts steem container
-    install_docker - install docker
-    install - pulls latest docker image from server (no compiling)
-    install_full - pulls latest (FULL NODE FOR RPC) docker image from server (no compiling)
-    rebuild - builds steem container (from docker file), and then restarts it
-    build - only builds steem container (from docker file)
-    logs - show all logs inc. docker logs, and steem logs
-    wallet - open cli_wallet in the container
-    remote_wallet - open cli_wallet in the container connecting to a remote seed
-    enter - enter a bash session in the currently running container
-    shell - launch the steem container with appropriate mounts, then open bash for inspection
+    start           - starts steem container
+    stop            - stops steem container
+    kill            - force stop steem container (in event of steemd hanging indefinitely)
+    restart         - restarts steem container
+    replay          - starts steem container (in replay mode)
+    memory_replay   - starts steem container (in replay mode, with --memory-replay - for use with MIRA-enabled images only)
+    status          - show status of steem container
+
+    ver             - check version of Steem-in-a-box, your Steem docker image, and detect if any updates are available
+
+    clean           - Remove blockchain, p2p, and/or shared mem folder contents (warns beforehand)
+    dlblocks        - download and decompress the blockchain to speed up your first start
+    dlrocksdb       - download / replace RocksDB files - for use with MIRA-enabled Steem images
+
+    shm_size        - resizes /dev/shm to size given, e.g. ./run.sh shm_size 10G 
+
+    install_docker  - install docker
+    install         - pulls latest docker image from server (no compiling)
+    install_full    - pulls latest (FULL NODE FOR RPC) docker image from server (no compiling)
+    rebuild         - builds steem container (from docker file), and then restarts it
+    build           - only builds steem container (from docker file)
+    
+    logs            - show all logs inc. docker logs, and steem logs
+
+    wallet          - open cli_wallet in the container
+    remote_wallet   - open cli_wallet in the container connecting to a remote seed
+
+    enter           - enter a bash session in the currently running container
+    shell           - launch the steem container with appropriate mounts, then open bash for inspection
     "
     echo
     exit
@@ -398,6 +410,164 @@ dlblocks() {
     echo "Remember to resize your /dev/shm, and run with replay!"
     echo "$ ./run.sh shm_size SIZE (e.g. 8G)"
     echo "$ ./run.sh replay"
+}
+
+# usage: insert_env [env_line] (env_file)
+# example:
+#
+#       insert_env "SHM_DIR=${DATADIR}/rocksdb"
+#
+#       insert_env "DATADIR=/steem/data" "/steem/.env"
+#
+insert_env() {
+    local env_line="$1" env_file="${DIR}/.env"
+
+    (( $# >= 2 )) && env_file="$2"
+
+    local env_dir="$(dirname "$env_file")"
+
+    # If the .env file doesn't exist, then we need to attempt to create it
+    if [[ ! -f "$env_file" ]]; then
+        msg yellow " [...] File '$env_file' does not exist. Creating it."
+
+        # Check if we 
+        if ! ( [[ -w "$env_dir" ]] && [[ -x "$env_dir" ]] ) && ! can_write "$env_dir"; then
+            msg bold red " [!!!] ERROR: Your user does not have permission to write to '$env_dir'"
+            if ! sudo -n ls >/dev/null; then
+                msg bold red " [!!!] Attempted to test whether sudo works, but failed. Giving up."
+                msg bold red "       Please manually add the line '$env_line' to '$env_file'"
+                return 3
+            fi
+            msg yellow " >> The 'sudo' command appears to work. Attempting to create .env with correct permissions using sudo..."
+            sudo -n touch "$env_file"
+            sudo -n chown "$(whoami):$(whoami)" "$env_dir" "$env_file"
+            sudo -n chmod 700 "$env_file"
+            # echo "SHM_DIR=${out_dir}" | sudo -n tee -a "$env_file" > /dev/null
+        else
+            touch "$env_file"
+        fi
+        msg green " [+++] Created .env file at: $env_file"
+    fi
+
+    if ! [[ -w "$env_file" ]] && ! can_write "$env_file"; then
+        msg bold red " [!!!] ERROR: Your user does not have permission to write to '$env_file'"
+        if ! sudo -n ls >/dev/null; then
+            msg bold red " [!!!] Attempted to test whether sudo works, but failed. Giving up."
+            msg bold red "       Please manually add the line '$env_line' to '$env_file'"
+            return 3
+        fi
+        msg yellow " >> The 'sudo' command appears to work. Attempting to correct .env permissions using sudo..."
+        sudo -n touch "$env_file"
+        sudo -n chown "$(whoami):$(whoami)" "$env_dir" "$env_file"
+        sudo -n chmod 700 "$env_file"
+        echo "SHM_DIR=${out_dir}" | sudo -n tee -a "$env_file" > /dev/null
+    fi
+
+    msg yellow " [...] Inserting '${env_line}' into '$env_file'"
+    echo "$env_line" >> "$env_file"
+    msg green " [+++] Added '${env_line}' to '${env_file}'"
+    return 0
+}
+
+# usage: ./run.sh dlrocksdb (rocksdb_rsync_url) (rocksdb_output)
+#
+# with no args, equivalent to:
+#   ./run.sh dlrocksdb "$ROCKSDB_RSYNC" "$SHM_DIR"
+#
+# NOTE: if SHM_DIR contains "/dev/shm" - function will recommend changing this to "$DATADIR/rocksdb"
+#
+# example: 
+#   ./run.sh dlrocksdb "rsync://files.privex.io/steem/rocksdb/" "/steem/data/rocksdb/"
+#
+dlrocksdb() {
+    local url="$ROCKSDB_RSYNC" out_dir="$SHM_DIR" env_file="${DIR}/.env"
+    msg
+    msg bold green " ######################################################## "
+    msg bold green " #                                                      # "
+    msg bold green " #                                                      # "
+    msg bold green " #          Steem-in-a-Box RocksDB Downloader           # "
+    msg bold green " #                                                      # "
+    msg bold green " #               (C) 2020 Someguy123                    # "
+    msg bold green " #                                                      # "
+    msg bold green " #    SRC: github.com/Someguy123/steem-docker           # "
+    msg bold green " #                                                      # "
+    msg bold green " #    Fast and easy download + installation             # "
+    msg bold green " #    of RocksDB files from Privex Inc.                 # "
+    msg bold green " #                                                      # "
+    msg bold green " #    Do you enjoy our convenient block_log and         # "
+    msg bold green " #    MIRA RocksDB files?                               # "
+    msg bold green " #                                                      # "
+    msg bold green " #    Support our community infrastructure by buying    # "
+    msg bold green " #    a server from https://www.privex.io/     :)       # "
+    msg bold green " #                                                      # "
+    msg bold green " #                                                      # "
+    msg bold green " ######################################################## "
+    msg
+    if (( $# == 1 )); then
+        if egrep -q "rsync|@" <<< "$1"; then
+            msg yellow " >>> Detected argument 1 as an rsync URI. Using '$1' as ROCKSDB_RSYNC url"
+            url="$1"
+        else
+            msg yellow " >>> Argument 1 does not appear to be an rsync URI. Assuming argument is RocksDB output path: '$1'"
+            out_dir="$1"
+        fi
+    elif (( $# >= 2 )); then
+        msg yellow " >>> Using argument 1 as an rsync URI: '$1'"
+        msg yellow " >>> Using argument 2 as an RocksDB output path: '$2'"
+        url="$1"
+        out_dir="$2"
+    fi
+    msg
+
+    if grep -q "/dev/shm" <<< "$out_dir"; then
+        msg bold red "WARNING: The RocksDB output directory appears to be, or is within /dev/shm - Output directory is currently: $out_dir"
+        msg green "We strongly recommend that you store RocksDB on your disk, rather than inside of /dev/shm"
+
+        if yesno "${BOLD}${YELLOW}Do you want us to store RocksDB inside of '${DATADIR}/rocksdb/' instead?${RESET} (Y/n) > " defyes; then
+            out_dir="${DATADIR}/rocksdb/"
+            msg green " >> We'll download RocksDB into '$out_dir' this time."
+            msg green " >> For the Steem daemon to correctly use the RocksDB files, you'll need to correct SHM_DIR inside of your '.env' file."
+            if yesno "${BOLD}${YELLOW}Do you want us to automatically create/update your .env file with 'SHM_DIR=$out_dir' ? ${RESET} (Y/n) > " defyes; then
+                insert_env "SHM_DIR=${out_dir}"
+                if (( $? != 0 )); then
+                    msg bold red " [!!!] Error returned by insert_env function. Read above."
+                    return 1
+                fi
+            else
+                msg yellow " >> Not modifying .env file"
+            fi
+        else
+            msg yellow " >> Not modifying RocksDB output directory"
+            msg yellow " >> Will output RocksDB to original directory: $out_dir"
+        fi
+    fi
+    msg
+
+    if [[ ! -d "$out_dir" ]]; then
+        msg yellow " >> Output directory '$out_dir' doesn't exist..."
+        msg green  " >> Creating folder + parent folders of '$out_dir' ..."
+        mkdir -v -p "$out_dir"
+    fi
+    msg
+
+    #local url="$1"
+    msg yellow "This may take a while, and may at times appear to be stalled. ${BOLD}Be patient, it may take time (3 to 10 mins) to scan the differences."
+    msg yellow "Once it detects the differences, it will download at very high speed depending on how much of your RocksDB files are intact."
+    echo -e "\n==============================================================="
+    echo -e "${BOLD}Downloading via:${RESET}\t${url}"
+    echo -e "${BOLD}Writing to:${RESET}\t\t${out_dir}"
+    echo -e "===============================================================\n"
+    # I = ignore timestamps and size, vv = be more verbose, h = human readable
+    # append-verify = attempt to append to the file, but make sure to verify the existing pieces match the server
+    # delete = remove any files
+    rsync -Irvvh --delete --partial-dir="${DIR}/.rsync-partial" --progress "$url" "${out_dir}"
+    ret=$?
+    if (($ret==0)); then
+        msg bold green " (+) FINISHED. RocksDB downloaded via rsync (make sure to check for any errors above)"
+    else
+        msg bold red "An error occurred while downloading RocksDB via rsync... please check above for errors"
+    fi
+    return $ret
 }
 
 custom-dlblocks() {
@@ -1231,6 +1401,9 @@ case $1 in
         ;;
     dlblocks)
         dlblocks "${@:2}"
+        ;;
+    dlrocksdb)
+        dlrocksdb "${@:2}"
         ;;
     enter)
         enter
