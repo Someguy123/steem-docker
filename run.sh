@@ -5,6 +5,7 @@
 #
 
 
+SG_LOAD_LIBS=(gnusafe helpers trap_helper 'trap')
 # Error handling function for ShellCore
 _sc_fail() { >&2 echo "Failed to load or install Privex ShellCore..." && exit 1; }
 # If `load.sh` isn't found in the user install / global install, then download and run the auto-installer
@@ -16,6 +17,11 @@ _sc_fail() { >&2 echo "Failed to load or install Privex ShellCore..." && exit 1;
 [[ -d "${HOME}/.pv-shcore" ]] && source "${HOME}/.pv-shcore/load.sh" || \
     source "/usr/local/share/pv-shcore/load.sh" || _sc_fail
 
+# Privex ShellCore Error Handler
+# 0 = Abort immediately upon a non-zero return code
+# 1 = Ignore the next non-zero return code, then re-enable strict mode (0)
+# 2 = Fully disable non-zero error handling, until manually re-enabled via 'error_control 0' or 'error_control 1'
+error_control 2
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DOCKER_DIR="$DIR/dkr"}
@@ -30,6 +36,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
 : ${BC_HTTP="http://files.privex.io/steem/block_log.lz4"}
 
+# Uncompressed block_log over HTTP, used for getting size for truncation, and
+# potentially resuming downloads
+: ${BC_HTTP_RAW="http://files.privex.io/steem/block_log"}
+
 # Compression type, can be "xz", "lz4", or "no" (for no compression)
 # Uses on-the-fly de-compression while downloading, to conserve disk space
 # and save time by not having to decompress after the download is finished
@@ -41,15 +51,14 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Rsync URL for MIRA RocksDB files
 : ${ROCKSDB_RSYNC="rsync://files.privex.io/steem/rocksdb/"}
 
-BOLD="$(tput bold)"
-RED="$(tput setaf 1)"
-GREEN="$(tput setaf 2)"
-YELLOW="$(tput setaf 3)"
-BLUE="$(tput setaf 4)"
-MAGENTA="$(tput setaf 5)"
-CYAN="$(tput setaf 6)"
-WHITE="$(tput setaf 7)"
-RESET="$(tput sgr0)"
+if [ -t 1 ]; then
+    BOLD="$(tput bold)" RED="$(tput setaf 1)" GREEN="$(tput setaf 2)" YELLOW="$(tput setaf 3)" BLUE="$(tput setaf 4)"
+    MAGENTA="$(tput setaf 5)" CYAN="$(tput setaf 6)" WHITE="$(tput setaf 7)" RESET="$(tput sgr0)"
+else
+    BOLD="" RED="" GREEN="" YELLOW="" BLUE=""
+    MAGENTA="" CYAN="" WHITE="" RESET=""
+fi
+
 : ${DK_TAG="someguy123/steem:latest"}
 : ${DK_TAG_FULL="someguy123/steem:latest-full"}
 : ${SHM_DIR="/dev/shm"}
@@ -83,26 +92,49 @@ BUILD_VER=""
 #
 BUILD_ARGS=()
 
+# MSG_TS_DEFAULT controls whether timestamps are automatically added to any 
+# message that doesn't opt-out using 'nots', or whether messages need to 
+# specify 'ts' to enable timestamps.
+# This allows timestamps to be temporarily disabled per function, preventing the need to
+# constantly add "nots".
+#
+# 1 = msg timestamps are opt-out (to disable timestamps: msg nots green "some message")
+# 0 = msg timestamps are opt-in  (to enable timestamps:  msg ts green "some message")
+MSG_TS_DEFAULT=1
+
 # easy coloured messages function
 # written by @someguy123
 function msg () {
-    # usage: msg [color] message
     if [[ "$#" -eq 0 ]]; then echo ""; return; fi;
     if [[ "$#" -eq 1 ]]; then
         echo -e "$1"
         return
     fi
+
+    _msg=""
+
+    if (( MSG_TS_DEFAULT == 1 )); then
+        [[ "$1" == "ts" ]] && shift
+        { [[ "$1" == "nots" ]] && shift; } || _msg="[$(date +'%Y-%m-%d %H:%M:%S %Z')] "
+    else
+        [[ "$1" == "nots" ]] && shift
+        [[ "$1" == "ts" ]] && shift && _msg="[$(date +'%Y-%m-%d %H:%M:%S %Z')] "
+    fi
+
     if [[ "$#" -gt 2 ]] && [[ "$1" == "bold" ]]; then
         echo -n "${BOLD}"
         shift
     fi
-    _msg="[$(date +'%Y-%m-%d %H:%M:%S %Z')] ${@:2}"
+    (($#==1)) && _msg+="$@" || _msg+="${@:2}"
+
     case "$1" in
         bold) echo -e "${BOLD}${_msg}${RESET}";;
-        [Bb]*) echo -e "${BLUE}${_msg}${RESET}";;
-        [Yy]*) echo -e "${YELLOW}${_msg}${RESET}";;
-        [Rr]*) echo -e "${RED}${_msg}${RESET}";;
-        [Gg]*) echo -e "${GREEN}${_msg}${RESET}";;
+        BLUE|blue) echo -e "${BLUE}${_msg}${RESET}";;
+        YELLOW|yellow) echo -e "${YELLOW}${_msg}${RESET}";;
+        RED|red) echo -e "${RED}${_msg}${RESET}";;
+        GREEN|green) echo -e "${GREEN}${_msg}${RESET}";;
+        CYAN|cyan) echo -e "${CYAN}${_msg}${RESET}";;
+        MAGENTA|magenta|PURPLE|purple) echo -e "${MAGENTA}${_msg}${RESET}";;
         * ) echo -e "${_msg}";;
     esac
 }
@@ -412,6 +444,307 @@ dlblocks() {
     echo "$ ./run.sh replay"
 }
 
+# Set these environment vars to skip the yes/no prompts during fix-blocks
+# 0 = default (prompt user for action),    1 = automatically answer "yes",    2 = automatically answer "no"
+: ${AUTO_FIX_BLOCKLOG=0}
+: ${AUTO_FIX_BLOCKINDEX=0}
+: ${AUTO_FIX_ROCKSDB=0}
+
+# If AUTO_FIX_BLOCKLOG is set to 1, this controls whether we verify block_log via checksummed rsync, in the
+# event that the local block_log is the same size as the remote block_log
+# 1 = (default) Do not attempt to verify/repair block_log if the size is equal to the remote server
+# 0 = Attempt to verify/repair block_log even if the size is equal to the remote server
+: ${AUTO_IGNORE_EQUAL=1}
+
+
+# internal helper function for handling AUTO_FIX_ prompts
+# if first arg is 1, will return 0 (true) immediately
+# if first arg is 2, will return 1 (false) immediately
+# if first arg is any other number, e.g. 0, then will display a prompt using 'yesno' with arg 2+
+#
+# usage:
+#     if _fixbl_prompt ${AUTO_FIX_BLOCKLOG} "Trim blocklog? (y/N) > " defno; then
+#       echo "trimming blocklog"
+#     else
+#       echo "not trimming blocklog"
+#     fi
+#
+_fixbl_prompt() {
+    (( $1 == 1 )) || { (( $1 != 2 )) && yesno "${@:2}"; };
+}
+
+local-file-size() {
+    local curr_os=$(uname -s)
+
+    if grep -qi "linux" <<< "$curr_os"; then
+        stat --printf="%s" "$1"
+    elif egrep -qi "darwin|freebsd|openbsd" <<< "$curr_os"; then
+        stat -f "%z" "$1"
+    else
+        du --apparent-size --block-size=1 "$1"
+    fi
+}
+
+# usage: fix-blocks-blocklog (path to local block_log)
+#
+# example:
+#   # With no arguments, it will default to ${BC_FOLDER}/block_log
+#   fix-blocks-blocklog
+#   # Otherwise, you can specify the path to the local block_log to be repaired
+#   fix-blocks-blocklog "/steem/data/witness_node_data_dir/blockchain/block_log"
+#
+fix-blocks-blocklog() {
+    msg
+    msg bold green " ========================================================================"
+    msg bold green " =                                                                      ="
+    msg bold green " =      Updating, trimming, and validating your block_log               ="
+    msg bold green " =                                                                      ="
+    msg bold green " ========================================================================"
+    msg
+
+    local local_bsz=0 local_bl="${BC_FOLDER}/block_log"
+    local remote_bsz=$(remote-file-size "$BC_HTTP_RAW" | tr -d '\r')
+    (( $# > 0 )) && local_bl="$1"
+    _debug "before local-file-size"
+    if [[ -f "$local_bl" ]]; then
+        local_bsz=$(local-file-size "$local_bl")
+    fi
+
+    _debug "before casting local_bsz / remote_bsz"
+    _debug "local_bsz   is:   $local_bsz"
+    _debug "remote_bsz  is:   $remote_bsz"
+
+    _debug "casting remote_bsz"
+    remote_bsz=$((remote_bsz))
+    _debug "casting local_bsz"
+    local_bsz=$((local_bsz))
+
+    msg
+    msg nots cyan   "    Local block_log path:    ${BOLD}$local_bl"
+    msg nots cyan   "    Local block_log size:    ${BOLD}$local_bsz bytes"
+    msg
+    msg nots cyan   "    Remote block_log URL:    ${BOLD}$BC_HTTP_RAW"
+    msg nots cyan   "    Remote block_log size:   ${BOLD}$remote_bsz bytes"
+    msg
+
+    _debug "before if (( $local_bsz > $remote_bsz ))"
+
+    if (( $local_bsz > $remote_bsz )); then
+        msg nots yellow " >> Your block_log file is larger than the remote block_log at $BC_HTTP_RAW"
+        msg
+        msg nots yellow " >> To repair your block_log, block_log.index, and/or RocksDB - we'll need to trim it"
+        msg
+        if _fixbl_prompt "$AUTO_FIX_BLOCKLOG" " ${MAGENTA}Do you want to trim your block_log down to $remote_bsz bytes?${RESET} (y/n) > "; then
+            msg green " [...] Trimming local block_log down to $remote_bsz bytes..."
+            truncate -s "$remote_bsz" "$local_bl"
+            msg green " [+++] Truncated block_log down to $remote_bsz bytes."
+        else
+            msg red " [!!!] Not trimming block_log"
+        fi
+    elif (( $local_bsz < $remote_bsz )); then
+        msg nots yellow " >> Your block_log file is smaller than the remote block_log at $BC_HTTP_RAW"
+        msg
+        msg nots yellow " >> To repair your block_log, block_log.index, and/or RocksDB - we'll need to download the rest of the block_log"
+        msg nots yellow " >> using rsync, which will append to your block_log, instead of downloading it from scratch."
+        msg
+        if _fixbl_prompt "$AUTO_FIX_BLOCKLOG" " ${MAGENTA}Do you want to download the rest of the block_log?${RESET} (y/n) > "; then
+            msg green " [...] Downloading block_log via rsync using --append ..."
+            rsync -Ivh --progress --append "$BC_RSYNC" "$local_bl"
+            msg green " [+++] Finished downloading block_log"
+        else
+            msg red " [!!!] Not downloading block_log"
+        fi
+    else
+        msg nots yellow " >> It appears your local block_log is the same size as the remote block_log at $BC_HTTP_RAW"
+        msg
+        msg nots yellow " >> If you believe your block_log is corrupted, we can repair it using rsync."
+        msg nots yellow " >> WARNING: This may take several hours, depending on your disk speed, network, and CPU performance."
+        msg nots yellow " >> You can say no, and we'll continue with the next fix-blocks step."
+        msg
+
+        # If AUTO_FIX_BLOCK_LOG is set to 1 (auto yes), but AUTO_IGNORE_EQUAL is also set to 1 (ignore equal size), 
+        # then we need to change _auto_fix to 2 (auto no), since the block_log is the same size as the remote server.
+        local _auto_fix=$(($AUTO_FIX_BLOCKLOG))
+        (( AUTO_FIX_BLOCKLOG == 1 )) && (( AUTO_IGNORE_EQUAL == 1 )) && _auto_fix=2
+
+        if _fixbl_prompt "$_auto_fix" " ${MAGENTA}Do you want to check your block_log for corruption via rsync?${RESET} (y/N) > " defno; then
+            msg green " [...] Verifying / repairing block_log via rsync using --inplace ..."
+            msg green " [...] It may take 30-60 minutes before you see any progress here ..."
+            rsync -Ivhc --progress --inplace "$BC_RSYNC" "$local_bl"
+            msg green " [+++] Finished validating block_log"
+        else
+            msg nots red "\n [!!!] Not validating block_log"
+        fi
+    fi
+    return 0
+}
+
+fix-blocks-index() {
+
+    msg
+    msg bold green " ========================================================================"
+    msg bold green " =                                                                      ="
+    msg bold green " =      Downloading / replacing your block_log.index                    ="
+    msg bold green " =                                                                      ="
+    msg bold green " ========================================================================"
+    msg
+    
+
+    local local_idx="${BC_FOLDER}/block_log.index"
+    (( $# > 0 )) && local_idx="$1"
+
+    if _fixbl_prompt "$AUTO_FIX_BLOCKINDEX" "${MAGENTA}Do you want to replace your block_log.index to match the server?${RESET} (Y/n) > " defyes; then
+        msg green " [...] Updating block_log.index to match the remote server's copy ..."
+        rsync -Ivhc --partial-dir="${DIR}/.rsync-partial" --progress "${BC_RSYNC}.index" "${local_idx}"
+        msg green " [+++] Finished downloading/validating block_log.index"
+    else
+        msg nots red "\n [!!!] Not replacing block_log.index"
+    fi
+}
+
+fix-blocks-rocksdb() {
+    msg
+    msg bold green " ========================================================================"
+    msg bold green " =                                                                      ="
+    msg bold green " =      Synchronising RocksDB Files for MIRA nodes                      ="
+    msg bold green " =                                                                      ="
+    msg bold green " ========================================================================"
+    msg
+
+    msg nots yellow " >> If you use a MIRA-enabled image, i.e. using RocksDB instead of shared_memory.bin, then your"
+    msg nots yellow " >> RocksDB files must have been generated using the same block_log and block_log.index"
+    msg
+    msg nots cyan   "    Local RocksDB/SHM_DIR folder:    ${BOLD}$SHM_DIR"
+    msg nots cyan   "    Remote RocksDB source:           ${BOLD}$ROCKSDB_RSYNC"
+    msg
+    msg nots yellow " >> If you've repaired your block_log or block_log.index, and you use MIRA, then it's important that"
+    msg nots yellow " >> your RocksDB files match the remote server's copy exactly."
+    msg
+    if _fixbl_prompt "$AUTO_FIX_ROCKSDB" " ${MAGENTA}Do you want to synchronise your MIRA RocksDB files with the server?${RESET} (y/N) > " defno; then
+        msg
+        msg green "\n [...] Updating RocksDB files to match the remote server's copy ...\n"
+        msg
+        _dlrocksdb
+        msg
+        msg green "\n [+++] Finished downloading/validating RocksDB files into $SHM_DIR \n"
+    else
+        msg nots red "\n [!!!] Not synchronising RocksDB files with remote server \n"
+    fi
+}
+
+_fix_blocks_help() {
+    MSG_TS_DEFAULT=0
+    msg
+    msg green "Usage:"
+    msg green "    $0 fix-blocks (blocklog|index|rocksdb|all) (auto)"
+    msg
+    msg yellow "Examples:"
+    msg bold   "\t # Download/replace/repair the block_log, block_log.index, and rocksdb files - prompting user before starting each action"
+    msg bold   "\t $0 fix-blocks"
+    msg
+    msg bold   "\t # Compare the local block_log size against the remote server block_log, will show a yes/no prompt allowing user to decide"
+    msg bold   "\t # whether or not to update / verify / truncate their local block_log."
+    msg bold   "\t $0 fix-blocks blocklog"
+    msg
+    msg bold   "\t # Synchronise RocksDB files with server, and skip the yes/no prompt"
+    msg bold   "\t $0 fix-blocks rocksdb auto"
+    msg
+    msg bold   "\t # Automatically attempt to repair block_log and block_log.index non-interactively, while skipping the RocksDB download/repair step."
+    msg bold   "\t AUTO_FIX_BLOCKLOG=1 AUTO_FIX_BLOCKINDEX=1 AUTO_FIX_ROCKSDB=2 $0 fix-blocks"
+    msg
+    msg yellow "If no blockchain component is specified (e.g. blocklog or index), fix-blocks will try to repair (with prompts) in order:" 
+    msg
+    msg yellow "    - block_log"
+    msg yellow "    - block_log.index"
+    msg yellow "    - rocksdb"
+    msg
+
+    msg bold green "Environment Variables"
+    msg
+    msg green " Several AUTO_FIX_ env vars are available, allowing the fix-blocks yes/no prompts to be automatically answered."
+    msg green " They're most useful when running fix-blocks from within a non-interactive script, e.g. via crontab. "
+    msg
+    msg green " All AUTO_FIX_ env vars can be one of three values:"
+    msg green "     0 = prompt before taking action (default)"
+    msg green "     1 = automatically answer yes to prompts"
+    msg green "     2 = automatically answer no to prompts"
+    msg
+    msg green " - AUTO_FIX_BLOCKLOG   (def: 0) - Controls whether block_log update/verify/truncate prompt is automatically responded to"
+    msg green " - AUTO_FIX_BLOCKINDEX (def: 0) - Controls whether block_log.index synchronization prompt is automatically responded to"
+    msg green " - AUTO_FIX_ROCKSDB    (def: 0) - Controls whether rocksdb synchronization prompt is automatically responded to"
+    msg
+    msg green " - AUTO_IGNORE_EQUAL   (def: 1) - Additional control when AUTO_FIX_BLOCKLOG is set to 1 (auto yes) - controls whether block_log"
+    msg green "                       should be rsync verified against the remote server in the event that the local block_log is the same size"
+    msg green "                       as the remote block_log."
+    msg
+    msg green "                       When set to 1:   Do not attempt to verify/repair the block_log if it's the same size as the remote server"
+    msg green "                       When set to 0:   Always verify/repair the block_log, even when it's the same size as the remote server"
+    msg
+    
+    msg
+    msg bold green "Available fix-blocks actions and descriptions"
+    msg
+    msg green " blocklog / block_log / blocks      - Fast and easy repair of local block_log, using size comparisons against the remote"
+    msg green "                                      blockchain mirror. Uses rsync to quickly append to block_log if it's too small, while"
+    msg green "                                      using inplace rsync with checksumming to test block_log for corruption if block_log is the same size. "
+    msg green "                                      If local block_log is larger than the remote server's, the command can automatically trim the "
+    msg green "                                      block_log to the correct size."
+    msg
+    msg green " index / blockindex / block_index   - Download / replace / repair local block_log.index from remote blockchain mirror, using rsync with checksumming. "
+    msg
+    msg green " rocksdb / rocks / mira             - Download / replace / repair local RocksDB files (for MIRA images) from remote blockchain mirror, "
+    msg green "                                      using rsync with checksumming, and partial-dir allowing for resuming of download if it fails. "
+    msg
+
+    MSG_TS_DEFAULT=1
+
+}
+
+fix-blocks() {
+    error_control 0
+    local local_bl="${BC_FOLDER}/block_log"
+    if (( $# > 0 )); then
+        case "$1" in
+            help|HELP|--help|-h|-?)
+                _fix_blocks_help
+                return $?;;
+            
+            blocklog|blocks|block_log|blockchain)
+                fix-blocks-blocklog
+                return $?;;
+            
+            index|blockindex|block_index|block_log.index)
+                fix-blocks-index
+                return $?;;
+            
+            rocks*|mira|MIRA)
+                fix-blocks-rocksdb
+                return $?;;
+            
+            all)
+                echo
+                ;;
+            
+            *)
+                msg bold red "\n[!!!] Invalid option '$1' ...\n"
+                msg red " > Displaying fix-blocks help."
+                sleep 0.5
+                _fix_blocks_help
+                return 0
+                ;;
+
+        esac
+    fi      
+    msg
+    fix-blocks-blocklog "$local_bl"
+    msg "\n"
+    fix-blocks-index "${local_bl}.index"
+    msg "\n"
+    fix-blocks-rocksdb
+    msg "\n"
+    return 0
+}
+
 # usage: insert_env [env_line] (env_file)
 # example:
 #
@@ -467,6 +800,43 @@ insert_env() {
     echo "$env_line" >> "$env_file"
     msg green " [+++] Added '${env_line}' to '${env_file}'"
     return 0
+}
+
+_dlrocksdb() {
+    local url="$ROCKSDB_RSYNC" out_dir="$SHM_DIR"
+
+    (( $# > 0 )) && url="$1"
+    (( $# > 1 )) && out_dir="$2"
+    msg
+    if [[ ! -d "$out_dir" ]]; then
+        msg yellow " >> Output directory '$out_dir' doesn't exist..."
+        msg green  " >> Creating folder + parent folders of '$out_dir' ..."
+        mkdir -v -p "$out_dir"
+        msg
+    fi
+
+    msg yellow "This may take a while, and may at times appear to be stalled. ${BOLD}Be patient, it may take time (3 to 10 mins) to scan the differences."
+    msg yellow "Once it detects the differences, it will download at very high speed depending on how much of your RocksDB files are intact."
+    msg
+    echo -e "\n==============================================================="
+    echo -e "${BOLD}Downloading via:${RESET}\t${url}"
+    echo -e "${BOLD}Writing to:${RESET}\t\t${out_dir}"
+    echo -e "===============================================================\n"
+    msg
+    # I = ignore timestamps and size, vv = be more verbose, h = human readable
+    # r = recursive, c = compare files using checksumming
+    # delete        = remove any local files in out_dir which don't exist on the server
+    # partial-dir   = store partially downloaded file chunks in this folder, allowing downloads to be resumed
+    rsync -Irvhc --delete --partial-dir="${DIR}/.rsync-partial" --progress "$url" "${out_dir}"
+    ret=$?
+    msg
+    if (($ret==0)); then
+        msg bold green " (+) FINISHED. RocksDB downloaded via rsync (make sure to check for any errors above)"
+    else
+        msg bold red "An error occurred while downloading RocksDB via rsync... please check above for errors"
+    fi
+    return $ret
+
 }
 
 # usage: ./run.sh dlrocksdb (rocksdb_rsync_url) (rocksdb_output)
@@ -543,31 +913,26 @@ dlrocksdb() {
     fi
     msg
 
-    if [[ ! -d "$out_dir" ]]; then
-        msg yellow " >> Output directory '$out_dir' doesn't exist..."
-        msg green  " >> Creating folder + parent folders of '$out_dir' ..."
-        mkdir -v -p "$out_dir"
-    fi
-    msg
 
-    #local url="$1"
-    msg yellow "This may take a while, and may at times appear to be stalled. ${BOLD}Be patient, it may take time (3 to 10 mins) to scan the differences."
-    msg yellow "Once it detects the differences, it will download at very high speed depending on how much of your RocksDB files are intact."
-    echo -e "\n==============================================================="
-    echo -e "${BOLD}Downloading via:${RESET}\t${url}"
-    echo -e "${BOLD}Writing to:${RESET}\t\t${out_dir}"
-    echo -e "===============================================================\n"
-    # I = ignore timestamps and size, vv = be more verbose, h = human readable
-    # append-verify = attempt to append to the file, but make sure to verify the existing pieces match the server
-    # delete = remove any files
-    rsync -Irvvh --delete --partial-dir="${DIR}/.rsync-partial" --progress "$url" "${out_dir}"
-    ret=$?
-    if (($ret==0)); then
-        msg bold green " (+) FINISHED. RocksDB downloaded via rsync (make sure to check for any errors above)"
-    else
-        msg bold red "An error occurred while downloading RocksDB via rsync... please check above for errors"
-    fi
-    return $ret
+    _dlrocksdb "$url" "$out_dir"
+
+}
+
+
+# Returns the size (in bytes) of a file on a HTTP(S) server
+#
+# usage:
+#
+#     $ s=$(remote-file-size "http://files.privex.io/steem/block_log")
+#     $ echo $s
+#     270743893301
+#
+# original source: https://stackoverflow.com/a/4497786
+#
+remote-file-size() {
+    local url="$1"
+
+    curl -sI "$url" | grep -i "content-length" | awk '{print $2}'
 }
 
 custom-dlblocks() {
@@ -1405,6 +1770,9 @@ case $1 in
     dlrocksdb)
         dlrocksdb "${@:2}"
         ;;
+    fix-blocks|fix_blocks|fixblocks)
+        fix-blocks "${@:2}"
+        ;;
     enter)
         enter
         ;;
@@ -1428,4 +1796,6 @@ case $1 in
         help
         ;;
 esac
+
+exit 0
 
