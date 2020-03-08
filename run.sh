@@ -622,11 +622,10 @@ fix-blocks-rocksdb() {
     msg
     if _fixbl_prompt "$AUTO_FIX_ROCKSDB" " ${MAGENTA}Do you want to synchronise your MIRA RocksDB files with the server?${RESET} (y/N) > " defno; then
         msg
-        msg green "\n [...] Updating RocksDB files to match the remote server's copy ...\n"
+        msg nots green "\n [...] Updating RocksDB files to match the remote server's copy ..."
+        _SILENCE_RDB_INTRO=1 dlrocksdb
         msg
-        _dlrocksdb
-        msg
-        msg green "\n [+++] Finished downloading/validating RocksDB files into $SHM_DIR \n"
+        msg green " [+++] Finished downloading/validating RocksDB files into $SHM_DIR \n"
     else
         msg nots red "\n [!!!] Not synchronising RocksDB files with remote server \n"
     fi
@@ -802,42 +801,127 @@ insert_env() {
     return 0
 }
 
+# usage: _foldersync-repair [rsync_url] [output_folder]
+# If user has existing RocksDB files, rsync must ignore local file timestamps/sizes and verify
+# local files against the server using checksums to ensure there's no hidden corruption.
+_foldersync-repair() {
+    # I = ignore timestamps and size, vv = be more verbose, h = human readable
+    # r = recursive, c = compare files using checksumming
+    # delete        = remove any local files in out_dir which don't exist on the server
+    # partial-dir   = store partially downloaded file chunks in this folder, allowing downloads to be resumed
+    rsync -Irvhc --delete --partial-dir="${DIR}/.rsync-partial" --progress "$1" "$2"
+}
+
+# usage: _foldersync-fresh [rsync_url] [output_folder]
+# If user doesn't have existing RocksDB files, we can use standard rsync recursive+delete
+# We don't need to bother with checksums, nor ignoring local file timestamps.
+_foldersync-fresh() {
+    # r = recursive, vv = be more verbose, h = human readable
+    # delete        = remove any local files in out_dir which don't exist on the server
+    # partial-dir   = store partially downloaded file chunks in this folder, allowing downloads to be resumed
+    rsync -rvh --delete --partial-dir="${DIR}/.rsync-partial" --progress "$1" "$2"
+}
+
 _dlrocksdb() {
-    local url="$ROCKSDB_RSYNC" out_dir="$SHM_DIR"
+    local url="$ROCKSDB_RSYNC" out_dir="$SHM_DIR" 
+    # rdb_folder_existed is changed to 1 if we detect existing RocksDB files
+    # used to decide whether we need to ignore timestamps + use rsync checksumming
+    local rdb_folder_existed=0
+
+    MSG_TS_DEFAULT=0
 
     (( $# > 0 )) && url="$1"
     (( $# > 1 )) && out_dir="$2"
+
+    ######
+    # If the RocksDB folder doesn't exist, then we create it and we download the RocksDB files from scratch
+    # without needing Rsync checksumming + timestamp/size ignoring
+    #
+    # If it does exist, we check if it's empty. If it's empty, we use the same "fresh" rsync download method.
+    #
+    # If the folder isn't empty (i.e. at least 1 file), then we have to use the "rsync repair/replace" method,
+    # which disables timestamp/size comparisons, and enables additional checksumming to guarantee we don't have
+    # any corrupted RocksDB files locally.
+    ######
     msg
     if [[ ! -d "$out_dir" ]]; then
         msg yellow " >> Output directory '$out_dir' doesn't exist..."
         msg green  " >> Creating folder + parent folders of '$out_dir' ..."
         mkdir -v -p "$out_dir"
         msg
+        msg green " >> As the output folder didn't exist, will download RocksDB using faster method without rsync"
+        msg green " >> additional checksumming\n"
+    else
+        # Get list of files in rocksdb folder using `ls`, then count number of entries to detect if folder is empty
+        local rdb_files=($(ls "$out_dir"))
+        local total_rdb_files=$((${#rdb_files[@]}))
+        if (( total_rdb_files > 0 )); then
+            msg green " >> Output directory '$out_dir' already exists."
+            msg green " >> To ensure your existing RocksDB files match the remote server exactly, we're going to "
+            msg green " >> enable Rsync's checksum feature, as well as ignoring size/timestamps. \n"
+
+            msg red " [!!] This may be **slower** than deleting and re-downloading them from scratch."
+            msg red " [!!] "
+            msg red " [!!] If your system has a ${BOLD}slow CPU, or slow drives (e.g. spinning HDDs)${RESET}${RED}, we recommend "
+            msg red " [!!] deleting your RocksDB files and re-running '$0 fix-blocks rocksdb'"
+            msg red " [!!] This will download RocksDB without secondary checksumming:"
+            msg
+            msg cyan "            sudo rm -rf \"$out_dir\""""
+            msg cyan "            $0 fix-blocks rocksdb"""
+            msg
+            msg yellow " [!!] "
+            msg yellow " [!!] If you have a ${BOLD}slow network connection (i.e. below 100mbps)${RESET}${YELLOW}, you don't need to"
+            msg yellow " [!!] take any action - just wait while we repair your RocksDB files. "
+            msg yellow " [!!] On slow networks, it's best to use this partial repair process, which will attempt to"
+            msg yellow " [!!] download only the portions of each file which doesn't match our server."
+            msg yellow " [!!] \n"
+            rdb_folder_existed=1
+        else
+            msg green " >> Output directory '$out_dir' already exists."
+            msg green " >> Folder appears to be empty. Downloading RocksDB using faster method without rsync"
+            msg green " >> additional checksumming\n"
+            rdb_folder_existed=0
+        fi
+
     fi
 
     msg yellow "This may take a while, and may at times appear to be stalled. ${BOLD}Be patient, it may take time (3 to 10 mins) to scan the differences."
     msg yellow "Once it detects the differences, it will download at very high speed depending on how much of your RocksDB files are intact."
-    msg
     echo -e "\n==============================================================="
     echo -e "${BOLD}Downloading via:${RESET}\t${url}"
     echo -e "${BOLD}Writing to:${RESET}\t\t${out_dir}"
     echo -e "===============================================================\n"
-    msg
-    # I = ignore timestamps and size, vv = be more verbose, h = human readable
-    # r = recursive, c = compare files using checksumming
-    # delete        = remove any local files in out_dir which don't exist on the server
-    # partial-dir   = store partially downloaded file chunks in this folder, allowing downloads to be resumed
-    rsync -Irvhc --delete --partial-dir="${DIR}/.rsync-partial" --progress "$url" "${out_dir}"
+
+    if (( rdb_folder_existed == 0 )); then
+        msg ts bold green " [+] Downloading RocksDB using 'fresh download' method"
+        msg ts bold green " [+] This should take no more than a few minutes before it starts to show download progress\n"
+        _foldersync-fresh "$url" "$out_dir"
+    else
+        msg green " [+] Depending on your CPU / Disk speeds, this may take 10+ minutes before it displays any"
+        msg green " [+] download progress. Please be patient."
+        msg green " [+] If you have a fast network (100mbps+), ${BOLD}consider deleting RocksDB${RESET}${GREEN} and re-running this"
+        msg green " [+] command, as explained above in bold yellow text.\n"
+        msg ts bold green " [+] Downloading RocksDB using 'repair existing & download new files' method ...\n"
+
+        _foldersync-repair "$url" "$out_dir"
+    fi
+    # rsync -Irvhc --delete --partial-dir="${DIR}/.rsync-partial" --progress "$url" "${out_dir}"
     ret=$?
     msg
-    if (($ret==0)); then
-        msg bold green " (+) FINISHED. RocksDB downloaded via rsync (make sure to check for any errors above)"
+    if (( ret == 0 )); then
+        msg ts bold green " (+) FINISHED. RocksDB downloaded via rsync (make sure to check for any errors above)"
     else
-        msg bold red "An error occurred while downloading RocksDB via rsync... please check above for errors"
+        msg ts bold red "An error occurred while downloading RocksDB via rsync... please check above for errors"
     fi
     return $ret
 
 }
+
+# Internal variable used to silence the large "RocksDB Downloader" intro message block
+_SILENCE_RDB_INTRO=0
+# Set this to 1 in your .env to ignore SHM_DIR containing /dev/shm when using MIRA related functions
+# such as dlrocksdb
+: ${RDB_IGNORE_SHM=0}
 
 # usage: ./run.sh dlrocksdb (rocksdb_rsync_url) (rocksdb_output)
 #
@@ -845,6 +929,7 @@ _dlrocksdb() {
 #   ./run.sh dlrocksdb "$ROCKSDB_RSYNC" "$SHM_DIR"
 #
 # NOTE: if SHM_DIR contains "/dev/shm" - function will recommend changing this to "$DATADIR/rocksdb"
+# Disable this by setting "RDB_IGNORE_SHM=1"
 #
 # example: 
 #   ./run.sh dlrocksdb "rsync://files.privex.io/steem/rocksdb/" "/steem/data/rocksdb/"
@@ -852,27 +937,26 @@ _dlrocksdb() {
 dlrocksdb() {
     local url="$ROCKSDB_RSYNC" out_dir="$SHM_DIR" env_file="${DIR}/.env"
     msg
-    msg bold green " ######################################################## "
-    msg bold green " #                                                      # "
-    msg bold green " #                                                      # "
-    msg bold green " #          Steem-in-a-Box RocksDB Downloader           # "
-    msg bold green " #                                                      # "
-    msg bold green " #               (C) 2020 Someguy123                    # "
-    msg bold green " #                                                      # "
-    msg bold green " #    SRC: github.com/Someguy123/steem-docker           # "
-    msg bold green " #                                                      # "
-    msg bold green " #    Fast and easy download + installation             # "
-    msg bold green " #    of RocksDB files from Privex Inc.                 # "
-    msg bold green " #                                                      # "
-    msg bold green " #    Do you enjoy our convenient block_log and         # "
-    msg bold green " #    MIRA RocksDB files?                               # "
-    msg bold green " #                                                      # "
-    msg bold green " #    Support our community infrastructure by buying    # "
-    msg bold green " #    a server from https://www.privex.io/     :)       # "
-    msg bold green " #                                                      # "
-    msg bold green " #                                                      # "
-    msg bold green " ######################################################## "
-    msg
+    if (( _SILENCE_RDB_INTRO == 0 )); then
+        msg bold green " ############################################################################################ "
+        msg bold green " #                                                                                          # "
+        msg bold green " #                                                                                          # "
+        msg bold green " #                          Steem-in-a-Box RocksDB Downloader                               # "
+        msg bold green " #                                                                                          # "
+        msg bold green " #                   (C) 2020 Someguy123 - https://steempeak.com/@someguy123                # "
+        msg bold green " #                                                                                          # "
+        msg bold green " #                                                                                          # "
+        msg bold green " #    SRC: github.com/Someguy123/steem-docker                                               # "
+        msg bold green " #                                                                                          # "
+        msg bold green " #    Fast and easy download + installation of RocksDB files from Privex Inc.               # "
+        msg bold green " #                                                                                          # "
+        msg bold green " #    Do you enjoy our convenient block_log and MIRA RocksDB files?                         # "
+        msg bold green " #    Support our community services by buying a server from https://www.privex.io/ :)      # "
+        msg bold green " #                                                                                          # "
+        msg bold green " #                                                                                          # "
+        msg bold green " ############################################################################################ "
+        msg
+    fi
     if (( $# == 1 )); then
         if egrep -q "rsync|@" <<< "$1"; then
             msg yellow " >>> Detected argument 1 as an rsync URI. Using '$1' as ROCKSDB_RSYNC url"
@@ -893,7 +977,7 @@ dlrocksdb() {
         msg bold red "WARNING: The RocksDB output directory appears to be, or is within /dev/shm - Output directory is currently: $out_dir"
         msg green "We strongly recommend that you store RocksDB on your disk, rather than inside of /dev/shm"
 
-        if yesno "${BOLD}${YELLOW}Do you want us to store RocksDB inside of '${DATADIR}/rocksdb/' instead?${RESET} (Y/n) > " defyes; then
+        if (( RDB_IGNORE_SHM == 0 )) && yesno "${BOLD}${YELLOW}Do you want us to store RocksDB inside of '${DATADIR}/rocksdb/' instead?${RESET} (Y/n) > " defyes; then
             out_dir="${DATADIR}/rocksdb/"
             msg green " >> We'll download RocksDB into '$out_dir' this time."
             msg green " >> For the Steem daemon to correctly use the RocksDB files, you'll need to correct SHM_DIR inside of your '.env' file."
@@ -1182,7 +1266,7 @@ memory_replay() {
         docker ps
 	echo
 	read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
-        if [[ "$shouldstop" == "y" ]]; then
+    if [[ "$shouldstop" == "y" ]]; then
 		stop
 	else
 		echo $GREEN"Did not say 'y'. Quitting."$RESET
