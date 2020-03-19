@@ -1,27 +1,157 @@
 #!/usr/bin/env bash
-#
+#####################################################################################################
 # Steem node manager
 # Released under GNU AGPL by Someguy123
 #
+# Github: https://github.com/Someguy123/steem-docker
+#
+# **Steem-in-a-box** is a toolkit for using the Steem Docker images[1] published by @someguy123.
+# It's purpose is to simplify the deployment of `steemd` nodes.
+#
+# For more information, see README.md - or run `./run.sh help`
+#
+# [1] https://hub.docker.com/r/someguy123/steem/tags/
+#
+#####################################################################################################
+
+BOLD="" RED="" GREEN="" YELLOW="" BLUE="" MAGENTA="" CYAN="" WHITE="" RESET=""
+if [ -t 1 ]; then
+    BOLD="$(tput bold)" RED="$(tput setaf 1)" GREEN="$(tput setaf 2)" YELLOW="$(tput setaf 3)" BLUE="$(tput setaf 4)"
+    MAGENTA="$(tput setaf 5)" CYAN="$(tput setaf 6)" WHITE="$(tput setaf 7)" RESET="$(tput sgr0)"
+fi
+
+SIAB_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Array of Privex ShellCore modules to be loaded during ShellCore initialisation.
+SG_LOAD_LIBS=(gnusafe helpers trap_helper traplib)
+# Minimum required version of Privex ShellCore
+# If a version older than this is installed, an update will be forced immediately
+SIAB_MIN_SC_VER="0.4.3"
+# Global variable used by 000_shellcore_setup:_sc_force_update to inform run.sh if it needs to restart the script
+_SIAB_RELOAD=0
+
+source "${SIAB_DIR}/scripts/000_shellcore_setup.sh"
+
+_setup_shellcore
+
+# _siab_sc_init "$@"
+
+_sc_version_check "$@"
+
+if (( _SIAB_RELOAD == 1 )); then
+    _SIAB_RELOAD=0
+    echo -e "${GREEN} >>> Attempting to restart run.sh using command + args: ${RESET}\n"
+    echo "      $0 $*"
+    echo
+    echo -e "${GREEN} [...] Re-executing run.sh ...${RESET}\n\n"
+    set +u          # Ignore undefined variables until the script is finished reloading
+    cleanup_env     # Remove old SG_ and SRCED_ env vars before reloading to avoid conflicts
+    exec "$0" "$@"  # Reload run.sh by replacing the currently running script with run.sh, using the same arguments as before.
+    exit
+fi
+
+# sg_load_lib 'trap'
+
+autoupdate_shellcore
+
+# ShellCore version 0.3.0, 0.3.1 and 0.4.0 contain a critical bug preventing automatic update, among other problems.
+# If we detect one of those versions installed, we must force an immediate ShellCore update to the latest version.
+# The 'update_shellcore' function still works fine in 0.3.0 to 0.4.0 - just not 'autoupdate_shellcore'
+# if version_gt "$SIAB_MIN_SC_VER" "$S_CORE_VER"; then
+#     echo
+#     echo "${YELLOW} >>> Steem-in-a-box uses the Privex ShellCore library ( https://github.com/Privex/shell-core ) for certain functionality ${RESET}"
+#     echo
+#     echo " >>> Current Privex ShellCore version:     ${BOLD}${S_CORE_VER}${RESET}"
+#     echo " >>> Required Privex ShellCore version:    ${BOLD}${SIAB_MIN_SC_VER}${RESET} (or newer)${RESET}"
+#     echo
+#     echo "${YELLOW} >>> To ensure Steem-in-a-box functions correctly, we're going to update your Privex ShellCore installation immediately.${RESET}"
+#     echo "${YELLOW} >>> ShellCore is installed at: ${BOLD}${SG_DIR}${RESET}"
+#     echo
+#     echo "${YELLOW} >>> Please wait a moment while we update ShellCore. This will only take a few seconds :)${RESET}"
+#     echo "${RESET}"
+    
+#     update_shellcore
+#     source "${SG_DIR}/load.sh"
+#     echo "${GREEN} >>> Finished updating ShellCore :) - Current ShellCore Version: ${BOLD}${S_CORE_VER}${RESET}"
+#     echo -e "${GREEN} >>> Attempting to restart run.sh using command + args: ${RESET}\n"
+#     echo "      $0 $*"
+#     echo
+#     echo -e "${GREEN} [...] Re-executing run.sh ...${RESET}\n\n"
+#     # Reload run.sh by replacing the currently running script with run.sh, using the same arguments as before.
+#     exec "$0" "$@"
+# fi
 
 
-SG_LOAD_LIBS=(gnusafe helpers trap_helper 'trap')
-# Error handling function for ShellCore
-_sc_fail() { >&2 echo "Failed to load or install Privex ShellCore..." && exit 1; }
-# If `load.sh` isn't found in the user install / global install, then download and run the auto-installer
-# from Privex's CDN.
-[[ -f "${HOME}/.pv-shcore/load.sh" ]] || [[ -f "/usr/local/share/pv-shcore/load.sh" ]] || \
-    { curl -fsS https://cdn.privex.io/github/shell-core/install.sh | bash >/dev/null; } || _sc_fail
-
-# Attempt to load the local install of ShellCore first, then fallback to global install if it's not found.
-[[ -d "${HOME}/.pv-shcore" ]] && source "${HOME}/.pv-shcore/load.sh" || \
-    source "/usr/local/share/pv-shcore/load.sh" || _sc_fail
 
 # Privex ShellCore Error Handler
 # 0 = Abort immediately upon a non-zero return code
 # 1 = Ignore the next non-zero return code, then re-enable strict mode (0)
 # 2 = Fully disable non-zero error handling, until manually re-enabled via 'error_control 0' or 'error_control 1'
 error_control 2
+
+# If set to 1, the run.sh function siab_exit() will ALWAYS print a full traceback at the end of each run.sh execution
+# even if no error was detected.
+: ${SIAB_TRACE_EXIT=0}
+
+_ERROR_TRIGGERED=0
+_SIAB_HANDLE_EXIT=1
+
+print_traceback() { 
+    local trace_depth=1
+    (( $# > 0 )) && trace_depth=$(($1))
+    msgerr nots bold blue "\nTraceback:\n\n${RESET}${BOLD}$(trap_traceback $trace_depth)\n"
+}
+
+siab_error() {
+    local error_code="$?"
+    msg
+    msgerr bold red "A fatal error has occurred and SIAB run.sh must exit."
+    (( $# >= 1 )) && msgerr bold red "Line number which triggered this: $1"
+    (( $# >= 2 )) && msgerr bold red "Bash command / function which triggered this: $2"
+    msg
+    _ERROR_TRIGGERED=$error_code
+    (( error_code == 0 )) && _ERROR_TRIGGERED=1
+    exit $error_code
+}
+
+siab_exit() {
+    local error_code="$?"
+    (( _ERROR_TRIGGERED > 0 )) && error_code=$_ERROR_TRIGGERED
+    if (( _SIAB_HANDLE_EXIT == 1 )); then
+        msg
+        # (( error_code == 0 )) && msgerr green "run.sh has finished - exiting SIAB run.sh cleanly."
+        (( error_code != 0 )) && msgerr bold red "[ERROR] SIAB not exiting cleanly. Detected non-zero error code while exiting: $error_code"
+    fi
+
+    if (( SIAB_TRACE_EXIT == 1 )); then
+        msgerr bold red "[DEBUGGING] Detected SIAB_TRACE_EXIT == 1 - always running traceback on exit. Exit code: $error_code"
+        print_traceback -1
+    fi
+    exit $error_code
+}
+
+siab_abort() {
+    local error_code="$?" s_line="$1" s_cmd="$2" s_signal="$3"
+    msg "\n"
+    msgerr bold red "[ERROR] Detected signal '$s_signal' while executing line number $s_line - last command: $s_cmd"
+    print_traceback
+    [[ "$s_signal" == "SIGINT" ]] && msgerr bold red "[ERROR] SIGINT (CTRL-C) detected. User requested SIAB to exit immediately. Stopping run.sh ..."
+    msg "\n"
+
+    _SIAB_HANDLE_EXIT=0 && error_control 2
+    exit 5
+}
+
+declare -f -t siab_abort siab_error siab_exit print_traceback
+
+trap_add 'siab_exit' EXIT                                    # ! ! ! TRAP EXIT ! ! !
+trap_add 'siab_error ${LINENO} "$BASH_COMMAND"' ERR          # ! ! ! TRAP ERR ! ! !
+trap_add 'siab_abort ${LINENO} "$BASH_COMMAND" SIGINT' SIGINT
+trap_add 'siab_abort ${LINENO} "$BASH_COMMAND" SIGTERM' SIGTERM
+trap_add 'siab_abort ${LINENO} "$BASH_COMMAND" SIGHUP' SIGHUP
+# trap_add 'siab_error ${LINENO} "$BASH_COMMAND"' SIGINT       # ! ! ! TRAP ERR ! ! !
+# trap_add 'siab_error ${LINENO} "$BASH_COMMAND"' SIGTERM      # ! ! ! TRAP ERR ! ! !
+# trap_add 'siab_error ${LINENO} "$BASH_COMMAND"' SIGHUP      # ! ! ! TRAP ERR ! ! !
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DOCKER_DIR="$DIR/dkr"}
@@ -51,14 +181,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Rsync URL for MIRA RocksDB files
 : ${ROCKSDB_RSYNC="rsync://files.privex.io/steem/rocksdb/"}
 
-if [ -t 1 ]; then
-    BOLD="$(tput bold)" RED="$(tput setaf 1)" GREEN="$(tput setaf 2)" YELLOW="$(tput setaf 3)" BLUE="$(tput setaf 4)"
-    MAGENTA="$(tput setaf 5)" CYAN="$(tput setaf 6)" WHITE="$(tput setaf 7)" RESET="$(tput sgr0)"
-else
-    BOLD="" RED="" GREEN="" YELLOW="" BLUE=""
-    MAGENTA="" CYAN="" WHITE="" RESET=""
-fi
-
 : ${DK_TAG="someguy123/steem:latest"}
 : ${DK_TAG_FULL="someguy123/steem:latest-full"}
 : ${SHM_DIR="/dev/shm"}
@@ -74,12 +196,31 @@ fi
 # By default, only port 2001 will be exposed (the P2P seed port)
 : ${PORTS="2001"}
 
-# Internal variable. Set to 1 by build_full to inform child functions
-BUILD_FULL=0
-# Placeholder for custom tag var CUST_TAG (shared between functions)
-CUST_TAG="steem"
-# Placeholder for BUILD_VER shared between functions
-BUILD_VER=""
+# blockchain folder, used by dlblocks
+: ${BC_FOLDER="$DATADIR/witness_node_data_dir/blockchain"}
+
+: ${EXAMPLE_MIRA="$DATADIR/witness_node_data_dir/database.cfg.example"}
+: ${MIRA_FILE="$DATADIR/witness_node_data_dir/database.cfg"}
+
+: ${EXAMPLE_CONF="$DATADIR/witness_node_data_dir/config.ini.example"}
+: ${CONF_FILE="$DATADIR/witness_node_data_dir/config.ini"}
+
+# Set these environment vars to skip the yes/no prompts during fix-blocks
+# 0 = default (prompt user for action),    1 = automatically answer "yes",    2 = automatically answer "no"
+: ${AUTO_FIX_BLOCKLOG=0}
+: ${AUTO_FIX_BLOCKINDEX=0}
+: ${AUTO_FIX_ROCKSDB=0}
+
+# If AUTO_FIX_BLOCKLOG is set to 1, this controls whether we verify block_log via checksummed rsync, in the
+# event that the local block_log is the same size as the remote block_log
+# 1 = (default) Do not attempt to verify/repair block_log if the size is equal to the remote server
+# 0 = Attempt to verify/repair block_log even if the size is equal to the remote server
+: ${AUTO_IGNORE_EQUAL=1}
+
+
+BUILD_FULL=0        # Internal variable. Set to 1 by build_full to inform child functions
+CUST_TAG="steem"    # Placeholder for custom tag var CUST_TAG (shared between functions)
+BUILD_VER=""        # Placeholder for BUILD_VER shared between functions
 
 
 # Array of additional arguments to be passed to Docker during builds
@@ -146,15 +287,6 @@ if [[ -f .env ]]; then
     source .env
 fi
 
-# blockchain folder, used by dlblocks
-: ${BC_FOLDER="$DATADIR/witness_node_data_dir/blockchain"}
-
-: ${EXAMPLE_MIRA="$DATADIR/witness_node_data_dir/database.cfg.example"}
-: ${MIRA_FILE="$DATADIR/witness_node_data_dir/database.cfg"}
-
-: ${EXAMPLE_CONF="$DATADIR/witness_node_data_dir/config.ini.example"}
-: ${CONF_FILE="$DATADIR/witness_node_data_dir/config.ini"}
-
 # if the config file doesn't exist, try copying the example config
 if [[ ! -f "$CONF_FILE" ]]; then
     if [[ -f "$EXAMPLE_CONF" ]]; then
@@ -199,7 +331,7 @@ for i in $PORTS; do
 done
 
 # load docker hub API
-source scripts/000_docker.sh
+source "${SIAB_DIR}/scripts/030_docker.sh"
 
 help() {
     echo "Usage: $0 COMMAND [DATA]"
@@ -215,8 +347,12 @@ help() {
 
     ver             - check version of Steem-in-a-box, your Steem docker image, and detect if any updates are available
 
+    fix-blocks      - downloads / repairs your blockchain, block index, and/or rocksdb. 
+                      check '$0 fix-blocks help' for more info
+
     clean           - Remove blockchain, p2p, and/or shared mem folder contents (warns beforehand)
-    dlblocks        - download and decompress the blockchain to speed up your first start
+    dlblocks        - download and decompress the blockchain and block_log.index to speed up your first start
+    dlblockindex    - download/repair just the block index (block_log.index)
     dlrocksdb       - download / replace RocksDB files - for use with MIRA-enabled Steem images
 
     shm_size        - resizes /dev/shm to size given, e.g. ./run.sh shm_size 10G 
@@ -444,18 +580,6 @@ dlblocks() {
     echo "$ ./run.sh replay"
 }
 
-# Set these environment vars to skip the yes/no prompts during fix-blocks
-# 0 = default (prompt user for action),    1 = automatically answer "yes",    2 = automatically answer "no"
-: ${AUTO_FIX_BLOCKLOG=0}
-: ${AUTO_FIX_BLOCKINDEX=0}
-: ${AUTO_FIX_ROCKSDB=0}
-
-# If AUTO_FIX_BLOCKLOG is set to 1, this controls whether we verify block_log via checksummed rsync, in the
-# event that the local block_log is the same size as the remote block_log
-# 1 = (default) Do not attempt to verify/repair block_log if the size is equal to the remote server
-# 0 = Attempt to verify/repair block_log even if the size is equal to the remote server
-: ${AUTO_IGNORE_EQUAL=1}
-
 
 # internal helper function for handling AUTO_FIX_ prompts
 # if first arg is 1, will return 0 (true) immediately
@@ -532,7 +656,9 @@ fix-blocks-blocklog() {
     if (( $local_bsz > $remote_bsz )); then
         msg nots yellow " >> Your block_log file is larger than the remote block_log at $BC_HTTP_RAW"
         msg
-        msg nots yellow " >> To repair your block_log, block_log.index, and/or RocksDB - we'll need to trim it"
+        msg nots yellow " >> To repair your block_log - we'll need to trim it"
+        msg nots yellow " >> You won't be able to use the remote server's copy of block_log.index, and/or RocksDB unless your block_log"
+        msg nots yellow " >> is the same size as the server's copy."
         msg
         if _fixbl_prompt "$AUTO_FIX_BLOCKLOG" " ${MAGENTA}Do you want to trim your block_log down to $remote_bsz bytes?${RESET} (y/n) > "; then
             msg green " [...] Trimming local block_log down to $remote_bsz bytes..."
@@ -544,8 +670,10 @@ fix-blocks-blocklog() {
     elif (( $local_bsz < $remote_bsz )); then
         msg nots yellow " >> Your block_log file is smaller than the remote block_log at $BC_HTTP_RAW"
         msg
-        msg nots yellow " >> To repair your block_log, block_log.index, and/or RocksDB - we'll need to download the rest of the block_log"
-        msg nots yellow " >> using rsync, which will append to your block_log, instead of downloading it from scratch."
+        msg nots yellow " >> To repair your block_log - we'll need to download the rest of the block_log using rsync, "
+        msg nots yellow " >> which will append to your block_log, instead of downloading it from scratch."
+        msg nots yellow " >> You won't be able to use the remote server's copy of block_log.index, and/or RocksDB unless your block_log"
+        msg nots yellow " >> is the same size as the server's copy."
         msg
         if _fixbl_prompt "$AUTO_FIX_BLOCKLOG" " ${MAGENTA}Do you want to download the rest of the block_log?${RESET} (y/n) > "; then
             msg green " [...] Downloading block_log via rsync using --append ..."
@@ -580,6 +708,7 @@ fix-blocks-blocklog() {
 }
 
 fix-blocks-index() {
+    error_control 0
 
     msg
     msg bold green " ========================================================================"
@@ -595,6 +724,7 @@ fix-blocks-index() {
 
     if _fixbl_prompt "$AUTO_FIX_BLOCKINDEX" "${MAGENTA}Do you want to replace your block_log.index to match the server?${RESET} (Y/n) > " defyes; then
         msg green " [...] Updating block_log.index to match the remote server's copy ..."
+        # raise_error "something went wrong"
         rsync -Ivhc --partial-dir="${DIR}/.rsync-partial" --progress "${BC_RSYNC}.index" "${local_idx}"
         msg green " [+++] Finished downloading/validating block_log.index"
     else
@@ -809,7 +939,7 @@ _foldersync-repair() {
     # r = recursive, c = compare files using checksumming
     # delete        = remove any local files in out_dir which don't exist on the server
     # partial-dir   = store partially downloaded file chunks in this folder, allowing downloads to be resumed
-    rsync -Irvhc --delete --partial-dir="${DIR}/.rsync-partial" --progress "$1" "$2"
+    rsync -Irvhc --delete --inplace --progress "$1" "$2"
 }
 
 # usage: _foldersync-fresh [rsync_url] [output_folder]
@@ -819,7 +949,7 @@ _foldersync-fresh() {
     # r = recursive, vv = be more verbose, h = human readable
     # delete        = remove any local files in out_dir which don't exist on the server
     # partial-dir   = store partially downloaded file chunks in this folder, allowing downloads to be resumed
-    rsync -rvh --delete --partial-dir="${DIR}/.rsync-partial" --progress "$1" "$2"
+    rsync -rvh --delete --inplace --progress "$1" "$2"
 }
 
 _dlrocksdb() {
@@ -1064,7 +1194,7 @@ custom-dlblocks() {
 # Internal use
 # Usage: dl-blocks-rsync blocklog_url
 dl-blocks-rsync() {
-    local url="$1"
+    local url="$1" ret
     msg "This may take a while, and may at times appear to be stalled. ${YELLOW}${BOLD}Be patient, it takes time (3 to 10 mins) to scan the differences."
     msg "Once it detects the differences, it will download at very high speed depending on how much of your block_log is intact."
     echo -e "\n==============================================================="
@@ -1075,19 +1205,30 @@ dl-blocks-rsync() {
     # append-verify = attempt to append to the file, but make sure to verify the existing pieces match the server
     rsync -Ivvh --append-verify --progress "$url" "${BC_FOLDER}/block_log"
     ret=$?
-    if (($ret==0)); then
-        msg bold green " (+) FINISHED. Blockchain downloaded via rsync (make sure to check for any errors above)"
-    else
-        msg bold red "An error occurred while downloading via rsync... please check above for errors"
+    if (( ret != 0 )); then
+        msg bold red "An error occurred while downloading the blockchain via rsync... please check above for errors"
+        return $ret
     fi
+    
+    msg bold green " (+) FINISHED. Blockchain downloaded via rsync (make sure to check for any errors above)"
+
+    msg green " [+] Downloading block_log.index from ${url}.index"
+    rsync -Ivhc --append-verify --progress "${url}.index" "${BC_FOLDER}/block_log.index"
+
+    ret=$?
+    if (( ret != 0 )); then
+        msg bold red "An error occurred while downloading the block index via rsync... please check above for errors"
+        return $ret
+    fi
+    msg bold green " (+) FINISHED. Block index downloaded via rsync (make sure to check for any errors above)"
     return $ret
 }
 
 # Internal use
 # Usage: dl-blocks-http blocklog_url [compress_type]
 dl-blocks-http() {
-    local url="$1"
-    local compression="no"
+    local url="$1" ret compression="no"
+
     (( $# < 1 )) && msg bold red "ERROR: no url specified for dl-blocks-http" && return 1
     if (( $# == 2 )); then
         compression="$2"
@@ -1123,10 +1264,19 @@ dl-blocks-http() {
             ;;
     esac
     ret=$?
-    if (($ret==0)); then
-        msg bold green " (+) FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
-    else
-        msg bold red "An error occurred while downloading... please check above for errors"
+    if (( ret != 0 )); then
+        msg bold red "An error occurred while downloading the block index via HTTP... please check above for errors"
+        return $ret
+    fi
+    msg bold green " (+) FINISHED. Blockchain downloaded and decompressed (make sure to check for any errors above)"
+
+    msg bold green " [+] Downloading block_log.index from ${BC_HTTP_RAW}.index"
+    wget -c "${BC_HTTP_RAW}.index" -O "${BC_FOLDER}/block_log.index"
+    
+    ret=$?
+    if (( ret != 0 )); then
+        msg bold red "An error occurred while downloading the block index via HTTP... please check above for errors"
+        return $ret
     fi
     return $ret
 }
@@ -1850,6 +2000,9 @@ case $1 in
         ;;
     dlblocks)
         dlblocks "${@:2}"
+        ;;
+    dlblockindex|dlblocksindex|dl-block-index|dlblocks-index)
+        fix-blocks-index "${@:2}"
         ;;
     dlrocksdb)
         dlrocksdb "${@:2}"
