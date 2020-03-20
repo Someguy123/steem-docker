@@ -264,6 +264,20 @@ parse_build_args() {
     msg yellow " -> Docker build arguments: ${BOLD}${BUILD_ARGS[@]}"
 }
 
+build_local() {
+    STEEM_SOURCE="local_src_folder"
+    DOCKER_DIR="${DIR}/dkr_local"
+
+    if [[ ! -d "${DOCKER_DIR}/src" ]]; then
+        msg bold red "ERROR: You must place the source code inside of ${DOCKER_DIR}/src"
+        return 1
+    fi
+
+    msg green " >>> Local build requested."
+    msg green " >>> Will build Steem using code stored in '${DOCKER_DIR}/src' instead of remote git repo"
+    build "$@"
+}
+
 # Build standard low memory node as a docker image
 # Usage: ./run.sh build [version] [tag tag_name] [build_args]
 # Version is prefixed with v, matching steem releases
@@ -1171,6 +1185,9 @@ case $1 in
     build_full)
         msg bold yellow "You may want to use '$0 install_full' for a binary image instead, it's faster."
         build_full "${@:2}"
+        ;;
+    build_local)
+        build_local "${@:2}"
         ;;
     install_docker)
         install_docker

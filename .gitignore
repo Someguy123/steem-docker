@@ -8,3 +8,5 @@ data/advanced_benchmark.json
 data/r_advanced_benchmark.json
 rocksdb*
 
+dkr_local/src/
+
