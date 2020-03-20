@@ -50,38 +50,7 @@ if (( _SIAB_RELOAD == 1 )); then
     exit
 fi
 
-# sg_load_lib 'trap'
-
 autoupdate_shellcore
-
-# ShellCore version 0.3.0, 0.3.1 and 0.4.0 contain a critical bug preventing automatic update, among other problems.
-# If we detect one of those versions installed, we must force an immediate ShellCore update to the latest version.
-# The 'update_shellcore' function still works fine in 0.3.0 to 0.4.0 - just not 'autoupdate_shellcore'
-# if version_gt "$SIAB_MIN_SC_VER" "$S_CORE_VER"; then
-#     echo
-#     echo "${YELLOW} >>> Steem-in-a-box uses the Privex ShellCore library ( https://github.com/Privex/shell-core ) for certain functionality ${RESET}"
-#     echo
-#     echo " >>> Current Privex ShellCore version:     ${BOLD}${S_CORE_VER}${RESET}"
-#     echo " >>> Required Privex ShellCore version:    ${BOLD}${SIAB_MIN_SC_VER}${RESET} (or newer)${RESET}"
-#     echo
-#     echo "${YELLOW} >>> To ensure Steem-in-a-box functions correctly, we're going to update your Privex ShellCore installation immediately.${RESET}"
-#     echo "${YELLOW} >>> ShellCore is installed at: ${BOLD}${SG_DIR}${RESET}"
-#     echo
-#     echo "${YELLOW} >>> Please wait a moment while we update ShellCore. This will only take a few seconds :)${RESET}"
-#     echo "${RESET}"
-    
-#     update_shellcore
-#     source "${SG_DIR}/load.sh"
-#     echo "${GREEN} >>> Finished updating ShellCore :) - Current ShellCore Version: ${BOLD}${S_CORE_VER}${RESET}"
-#     echo -e "${GREEN} >>> Attempting to restart run.sh using command + args: ${RESET}\n"
-#     echo "      $0 $*"
-#     echo
-#     echo -e "${GREEN} [...] Re-executing run.sh ...${RESET}\n\n"
-#     # Reload run.sh by replacing the currently running script with run.sh, using the same arguments as before.
-#     exec "$0" "$@"
-# fi
-
-
 
 # Privex ShellCore Error Handler
 # 0 = Abort immediately upon a non-zero return code
@@ -192,6 +161,9 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Git repository to use when building Steem - containing steemd code
 : ${STEEM_SOURCE="https://github.com/steemit/steem.git"}
 
+# Local steemd RPC port, used by commands such as 'monitor' which need to query your steemd's HTTP RPC
+: ${STEEM_RPC_PORT="8091"}
+
 # Comma separated list of ports to expose to the internet.
 # By default, only port 2001 will be exposed (the P2P seed port)
 : ${PORTS="2001"}
@@ -286,6 +258,9 @@ export RED GREEN YELLOW BLUE BOLD NORMAL RESET
 if [[ -f .env ]]; then
     source .env
 fi
+
+# load helpers
+source "${SIAB_DIR}/scripts/010_helpers.sh"
 
 # if the config file doesn't exist, try copying the example config
 if [[ ! -f "$CONF_FILE" ]]; then
@@ -1783,6 +1758,65 @@ status() {
 
 }
 
+rpc-global-props() {
+    local ct_ip=$(get_container_ip "$DOCKER_NAME")
+    local rpc_url="http://${ct_ip}:${STEEM_RPC_PORT}"
+    # local rpc_url="https://steemd.privex.io/"
+
+    curl -fsSL --data '{"jsonrpc": "2.0", "method": "condenser_api.get_dynamic_global_properties", "params": [], "id": 1}' "$rpc_url"
+}
+
+siab-monitor() {
+    local props head_block block_time seconds_behind time_behind
+    local blocks_synced=0 started_at="$(rfc_datetime)" starting_block=0
+    local time_since_start mins_since_start bps=0 bpm=0
+
+    error_control 0
+    msg
+    msg nots bold green "--- Steem-in-a-box Sync Monitor --- \n"
+    msg nots bold green "Monitoring your local steemd instance\n"
+    msg nots bold green "Block data will update every 10 seconds, showing the block number that your node is synced up to"
+    msg nots bold green "the date/time that block was produced, and how far behind in days/hours/minutes that block is.\n"
+    msg nots bold green "After the first check, we'll also output how many blocks have been synced so far, as well as"
+    msg nots bold green "the estimated blocks per second (BPS) that your node is syncing by.\n"
+    msg nots bold yellow "NOTE: This will not work with a replaying node. Only with a node which is synchronising.\n"
+    
+    msg nots "======================================================================\n"
+
+
+    while true; do
+        props=$(rpc-global-props)
+        head_block=$(echo "$props" | jq -r '.result.head_block_number')
+        block_time=$(echo "$props" | jq -r '.result.time')
+        seconds_behind=$(compare_dates "$(rfc_datetime)" "$block_time")
+        time_behind="$(human_seconds "${seconds_behind}")"
+
+        msg green "Current block:             ${head_block}"
+        msg green "Block time:                ${block_time}"
+        msg green "Time behind head block:    ${time_behind}"
+        msg
+
+        (( starting_block == 0 )) && starting_block="$head_block"
+
+        blocks_synced=$((head_block - starting_block))
+
+        if (( blocks_synced > 0 )); then
+            msg green "New blocks since start: $blocks_synced"
+            time_since_start=$(compare_dates "$(rfc_datetime)" "$started_at")
+            bps=$((blocks_synced/time_since_start))
+            mins_since_start=$((time_since_start / 60))
+            msg green "Blocks per second:      $bps"
+            if (( mins_since_start > 0 )); then
+                bpm=$(( blocks_synced / (time_since_start / 60) ))
+                msg green "Blocks per minute:      $bpm"
+            fi
+            msg
+        fi
+        msg nots "======================================================================"
+        sleep 10
+    done
+}
+
 # Usage: ./run.sh clean [blocks|shm|all]
 # Removes blockchain, p2p, and/or shared memory folder contents, with interactive prompts.
 #
@@ -2009,6 +2043,9 @@ case $1 in
         ;;
     fix-blocks|fix_blocks|fixblocks)
         fix-blocks "${@:2}"
+        ;;
+    monitor)
+        siab-monitor "${@:2}"
         ;;
     enter)
         enter
