@@ -128,9 +128,40 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DATADIR="$DIR/data"}
 : ${DOCKER_NAME="seed"}
 
+
+if [[ -f .env ]]; then
+    source .env
+fi
+
+: ${NETWORK="steem"}
+
+
+if [[ "$NETWORK" == "hive" ]]; then
+    : ${DOCKER_IMAGE="hive"}
+    : ${STEEM_SOURCE="https://github.com/openhive-network/hive.git"}
+
+    : ${NETWORK_NAME="Hive"}
+    : ${SELF_NAME="Hive-in-a-box"}
+    
+    : ${BC_HTTP="http://files.privex.io/hive/block_log.lz4"}        # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
+    : ${BC_HTTP_RAW="http://files.privex.io/hive/block_log"}        # Uncompressed block_log over HTTP
+    : ${BC_HTTP_CMP="lz4"}                                          # Compression type, can be "xz", "lz4", or "no" (for no compression)
+    : ${BC_RSYNC="rsync://files.privex.io/hive/block_log"}          # Anonymous rsync daemon URL to the raw block_log
+    
+    : ${ROCKSDB_RSYNC="rsync://files.privex.io/hive/rocksdb/"}      # Rsync URL for MIRA RocksDB files
+
+    : ${DK_TAG_BASE="someguy123/hive"}
+
+    : ${REMOTE_WS="wss://hived.privex.io"}
+    : ${STOP_TIME=600}          # Amount of time in seconds to allow the docker container to stop before killing it.
+    : ${STEEM_RPC_PORT="8091"}  # Local steemd RPC port, used by commands such as 'monitor' which need to query your steemd's HTTP RPC
+fi
+
 # the tag to use when running/replaying steemd
 : ${DOCKER_IMAGE="steem"}
 
+: ${NETWORK_NAME="Steem"}
+: ${SELF_NAME="Steem-in-a-box"}
 
 # HTTP or HTTPS url to grab the blockchain from. Set compression in BC_HTTP_CMP
 : ${BC_HTTP="http://files.privex.io/steem/block_log.lz4"}
@@ -150,8 +181,9 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Rsync URL for MIRA RocksDB files
 : ${ROCKSDB_RSYNC="rsync://files.privex.io/steem/rocksdb/"}
 
-: ${DK_TAG="someguy123/steem:latest"}
-: ${DK_TAG_FULL="someguy123/steem:latest-full"}
+: ${DK_TAG_BASE="someguy123/steem"}
+: ${DK_TAG="${DK_TAG_BASE}:latest"}
+: ${DK_TAG_FULL="${DK_TAG_BASE}:latest-full"}
 : ${SHM_DIR="/dev/shm"}
 : ${REMOTE_WS="wss://steemd.privex.io"}
 # Amount of time in seconds to allow the docker container to stop before killing it.
@@ -255,10 +287,6 @@ function msg () {
 export -f msg
 export RED GREEN YELLOW BLUE BOLD NORMAL RESET
 
-if [[ -f .env ]]; then
-    source .env
-fi
-
 # load helpers
 source "${SIAB_DIR}/scripts/010_helpers.sh"
 
@@ -312,15 +340,15 @@ help() {
     echo "Usage: $0 COMMAND [DATA]"
     echo
     echo "Commands: 
-    start           - starts steem container
-    stop            - stops steem container
-    kill            - force stop steem container (in event of steemd hanging indefinitely)
-    restart         - restarts steem container
-    replay          - starts steem container (in replay mode)
-    memory_replay   - starts steem container (in replay mode, with --memory-replay - for use with MIRA-enabled images only)
-    status          - show status of steem container
+    start           - starts ${NETWORK_NAME} container
+    stop            - stops ${NETWORK_NAME} container
+    kill            - force stop ${NETWORK_NAME} container (in event of steemd hanging indefinitely)
+    restart         - restarts ${NETWORK_NAME} container
+    replay          - starts ${NETWORK_NAME} container (in replay mode)
+    memory_replay   - starts ${NETWORK_NAME} container (in replay mode, with --memory-replay - for use with MIRA-enabled images only)
+    status          - show status of ${NETWORK_NAME} container
 
-    ver             - check version of Steem-in-a-box, your Steem docker image, and detect if any updates are available
+    ver             - check version of ${SELF_NAME}, your ${NETWORK_NAME} docker image, and detect if any updates are available
 
     fix-blocks      - downloads / repairs your blockchain, block index, and/or rocksdb. 
                       check '$0 fix-blocks help' for more info
@@ -328,23 +356,23 @@ help() {
     clean           - Remove blockchain, p2p, and/or shared mem folder contents (warns beforehand)
     dlblocks        - download and decompress the blockchain and block_log.index to speed up your first start
     dlblockindex    - download/repair just the block index (block_log.index)
-    dlrocksdb       - download / replace RocksDB files - for use with MIRA-enabled Steem images
+    dlrocksdb       - download / replace RocksDB files - for use with MIRA-enabled ${NETWORK_NAME} images
 
     shm_size        - resizes /dev/shm to size given, e.g. ./run.sh shm_size 10G 
 
     install_docker  - install docker
     install         - pulls latest docker image from server (no compiling)
     install_full    - pulls latest (FULL NODE FOR RPC) docker image from server (no compiling)
-    rebuild         - builds steem container (from docker file), and then restarts it
-    build           - only builds steem container (from docker file)
+    rebuild         - builds ${NETWORK_NAME} container (from docker file), and then restarts it
+    build           - only builds ${NETWORK_NAME} container (from docker file)
     
-    logs            - show all logs inc. docker logs, and steem logs
+    logs            - show all logs inc. docker logs, and ${NETWORK_NAME} logs
 
     wallet          - open cli_wallet in the container
     remote_wallet   - open cli_wallet in the container connecting to a remote seed
 
     enter           - enter a bash session in the currently running container
-    shell           - launch the steem container with appropriate mounts, then open bash for inspection
+    shell           - launch the ${NETWORK_NAME} container with appropriate mounts, then open bash for inspection
     "
     echo
     exit
@@ -449,9 +477,9 @@ build() {
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
         For your safety, we've tagged this image as $CUST_TAG
-        To use it in this steem-docker, run: 
+        To use it in this ${SELF_NAME}, run: 
         ${GREEN}${BOLD}
-        docker tag $CUST_TAG steem:latest
+        docker tag $CUST_TAG ${DOCKER_IMAGE}:latest
         ${RESET}${RED}
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
     !!! !!! !!! !!! !!! !!! READ THIS !!! !!! !!! !!! !!! !!!
