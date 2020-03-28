@@ -1841,19 +1841,18 @@ siab-monitor() {
             bps=$((blocks_synced/time_since_start))
             mins_since_start=$((time_since_start / 60))
             msg green "Blocks per second:           $bps"
+
+            remote_props=$(rpc-global-props "$REMOTE_RPC")
+            remote_head_block=$(echo "$remote_props" | jq -r '.result.head_block_number')
+            msg green "Latest network block:        $remote_head_block (from RPC $REMOTE_RPC)"
+
+            blocks_behind=$(( remote_head_block - head_block ))
+            mins_remaining=$(( (blocks_behind / bps) / 60 ))
+            msg green "Blocks behind:               $blocks_behind"
+            msg green "ETA til Synced:              $mins_remaining minutes"
             if (( mins_since_start > 0 )); then
                 bpm=$(( blocks_synced / (time_since_start / 60) ))
                 msg green "Blocks per minute:           $bpm"
-
-                remote_props=$(rpc-global-props "$REMOTE_RPC")
-                remote_head_block=$(echo "$remote_props" | jq -r '.result.head_block_number')
-                msg green "Latest network block:        $remote_head_block (from RPC $REMOTE_RPC)"
-
-                blocks_behind=$(( remote_head_block - head_block ))
-                mins_remaining=$(( blocks_behind / bpm ))
-                msg green "Blocks behind:               $blocks_behind"
-                msg green "ETA til Synced:              $mins_remaining minutes"
-
             fi
             msg
         fi
