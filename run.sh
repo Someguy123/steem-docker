@@ -153,6 +153,8 @@ if [[ "$NETWORK" == "hive" ]]; then
     : ${DK_TAG_BASE="someguy123/hive"}
 
     : ${REMOTE_WS="wss://hived.privex.io"}
+    : ${REMOTE_RPC="https://hived.privex.io"}
+
     : ${STOP_TIME=600}          # Amount of time in seconds to allow the docker container to stop before killing it.
     : ${STEEM_RPC_PORT="8091"}  # Local steemd RPC port, used by commands such as 'monitor' which need to query your steemd's HTTP RPC
 fi
@@ -186,6 +188,7 @@ fi
 : ${DK_TAG_FULL="${DK_TAG_BASE}:latest-full"}
 : ${SHM_DIR="/dev/shm"}
 : ${REMOTE_WS="wss://steemd.privex.io"}
+: ${REMOTE_RPC="https://steemd.privex.io"}
 # Amount of time in seconds to allow the docker container to stop before killing it.
 # Default: 600 seconds (10 minutes)
 : ${STOP_TIME=600}
@@ -1787,8 +1790,12 @@ status() {
 }
 
 rpc-global-props() {
-    local ct_ip=$(get_container_ip "$DOCKER_NAME")
-    local rpc_url="http://${ct_ip}:${STEEM_RPC_PORT}"
+    if (( $# < 1 )); then
+        local ct_ip=$(get_container_ip "$DOCKER_NAME")
+        local rpc_url="http://${ct_ip}:${STEEM_RPC_PORT}"
+    else
+        local rpc_url="$1"
+    fi
     # local rpc_url="https://steemd.privex.io/"
 
     curl -fsSL --data '{"jsonrpc": "2.0", "method": "condenser_api.get_dynamic_global_properties", "params": [], "id": 1}' "$rpc_url"
@@ -1798,7 +1805,7 @@ siab-monitor() {
     local props head_block block_time seconds_behind time_behind
     local blocks_synced=0 started_at="$(rfc_datetime)" starting_block=0
     local time_since_start mins_since_start bps=0 bpm=0
-
+    local remote_props remote_head_block blocks_behind mins_remaining
     error_control 0
     msg
     msg nots bold green "--- Steem-in-a-box Sync Monitor --- \n"
@@ -1829,14 +1836,24 @@ siab-monitor() {
         blocks_synced=$((head_block - starting_block))
 
         if (( blocks_synced > 0 )); then
-            msg green "New blocks since start: $blocks_synced"
+            msg green "New blocks since start:      $blocks_synced"
             time_since_start=$(compare_dates "$(rfc_datetime)" "$started_at")
             bps=$((blocks_synced/time_since_start))
             mins_since_start=$((time_since_start / 60))
-            msg green "Blocks per second:      $bps"
+            msg green "Blocks per second:           $bps"
             if (( mins_since_start > 0 )); then
                 bpm=$(( blocks_synced / (time_since_start / 60) ))
-                msg green "Blocks per minute:      $bpm"
+                msg green "Blocks per minute:           $bpm"
+
+                remote_props=$(rpc-global-props "$REMOTE_RPC")
+                remote_head_block=$(echo "$remote_props" | jq -r '.result.head_block_number')
+                msg green "Latest network block:        $remote_head_block (from RPC $REMOTE_RPC)"
+
+                blocks_behind=$(( remote_head_block - head_block ))
+                mins_remaining=$(( blocks_behind / bpm ))
+                msg green "Blocks behind:               $blocks_behind"
+                msg green "ETA til Synced:              $mins_remaining minutes"
+
             fi
             msg
         fi
