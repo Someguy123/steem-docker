@@ -1803,6 +1803,10 @@ rpc-global-props() {
 
 _LN="======================================================================\n"
 
+: ${MONITOR_INTERVAL=10}
+
+MONITOR_INTERVAL=$((MONITOR_INTERVAL))
+
 siab-monitor() {
     local props head_block block_time seconds_behind time_behind
     local blocks_synced=0 started_at="$(rfc_datetime)" starting_block=0
@@ -1828,7 +1832,7 @@ siab-monitor() {
         if (( ret != 0 )); then
             msg bold red "Error while obtaining Local RPC global props. Will try again soon..."
             msg nots "$_LN"
-            sleep 10
+            sleep "$MONITOR_INTERVAL"
             continue
         fi
         head_block=$(echo "$props" | jq -r '.result.head_block_number')
@@ -1836,7 +1840,7 @@ siab-monitor() {
         if [ -z "$head_block" ] || [ -z "$block_time" ] || [[ "$head_block" == "null" ]] || [[ "$block_time" == "null" ]]; then
             msg bold red "Local RPC head block / block time was empty. Will try again soon..."
             msg nots "$_LN"
-            sleep 10
+            sleep "$MONITOR_INTERVAL"
             continue
         fi
 
@@ -1845,15 +1849,15 @@ siab-monitor() {
         seconds_behind=$(compare_dates "$current_timestamp" "$block_time")
         if (( ret != 0 )); then
             msg bold red "Local RPC timestamp was invalid (err: compare_dates). Will try again soon..."
-            msg nots "$_LN"; sleep 10; continue
+            msg nots "$_LN"; sleep "$MONITOR_INTERVAL"; continue
         fi
         time_behind="$(human_seconds "${seconds_behind}")"
         if (( ret != 0 )); then
             msg bold red "Local RPC timestamp was invalid (err: human_seconds). Will try again soon..."
-            msg nots "$_LN"; sleep 10; continue
+            msg nots "$_LN"; sleep "$MONITOR_INTERVAL"; continue
         fi
         error_control 0
-        
+
         msg green "Current block:             ${head_block}"
         msg green "Block time:                ${block_time}"
         msg green "Time behind head block:    ${time_behind}"
@@ -1878,7 +1882,7 @@ siab-monitor() {
                 if [ -z "$remote_head_block" ]; then
                     msg bold red "Remote RPC head block / block time was empty. Will try again soon..."
                     msg nots "$_LN"
-                    sleep 10
+                    sleep "$MONITOR_INTERVAL"
                     continue
                 fi
                 msg green "Latest network block:        $remote_head_block (from RPC $REMOTE_RPC)"
@@ -1894,14 +1898,14 @@ siab-monitor() {
             else
                 msg bold red "Error while obtaining Remote RPC global props. Will try again soon..."
                 msg nots "$_LN"
-                sleep 10
+                sleep "$MONITOR_INTERVAL"
                 continue
             fi
             
             msg
         fi
         msg nots "$_LN"
-        sleep 10
+        sleep "$MONITOR_INTERVAL"
     done
 }
 
