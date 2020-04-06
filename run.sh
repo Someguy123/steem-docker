@@ -1833,16 +1833,27 @@ siab-monitor() {
         fi
         head_block=$(echo "$props" | jq -r '.result.head_block_number')
         block_time=$(echo "$props" | jq -r '.result.time')
-        if [ -z "$head_block" ] || [ -z "$block_time" ]; then
+        if [ -z "$head_block" ] || [ -z "$block_time" ] || [[ "$head_block" == "null" ]] || [[ "$block_time" == "null" ]]; then
             msg bold red "Local RPC head block / block time was empty. Will try again soon..."
             msg nots "$_LN"
             sleep 10
             continue
         fi
 
-        seconds_behind=$(compare_dates "$(rfc_datetime)" "$block_time")
+        current_timestamp=$(rfc_datetime)
+        error_control 2
+        seconds_behind=$(compare_dates "$current_timestamp" "$block_time")
+        if (( ret != 0 )); then
+            msg bold red "Local RPC timestamp was invalid (err: compare_dates). Will try again soon..."
+            msg nots "$_LN"; sleep 10; continue
+        fi
         time_behind="$(human_seconds "${seconds_behind}")"
-
+        if (( ret != 0 )); then
+            msg bold red "Local RPC timestamp was invalid (err: human_seconds). Will try again soon..."
+            msg nots "$_LN"; sleep 10; continue
+        fi
+        error_control 0
+        
         msg green "Current block:             ${head_block}"
         msg green "Block time:                ${block_time}"
         msg green "Time behind head block:    ${time_behind}"
