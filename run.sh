@@ -1801,6 +1801,8 @@ rpc-global-props() {
     curl -fsSL --data '{"jsonrpc": "2.0", "method": "condenser_api.get_dynamic_global_properties", "params": [], "id": 1}' "$rpc_url"
 }
 
+_LN="======================================================================\n"
+
 siab-monitor() {
     local props head_block block_time seconds_behind time_behind
     local blocks_synced=0 started_at="$(rfc_datetime)" starting_block=0
@@ -1816,13 +1818,28 @@ siab-monitor() {
     msg nots bold green "the estimated blocks per second (BPS) that your node is syncing by.\n"
     msg nots bold yellow "NOTE: This will not work with a replaying node. Only with a node which is synchronising.\n"
     
-    msg nots "======================================================================\n"
+    msg nots "$_LN"
 
 
     while true; do
+        error_control 1
         props=$(rpc-global-props)
+        ret=$?
+        if (( ret != 0 )); then
+            msg bold red "Error while obtaining Local RPC global props. Will try again soon..."
+            msg nots "$_LN"
+            sleep 10
+            continue
+        fi
         head_block=$(echo "$props" | jq -r '.result.head_block_number')
         block_time=$(echo "$props" | jq -r '.result.time')
+        if [ -z "$head_block" ] || [ -z "$block_time" ]; then
+            msg bold red "Local RPC head block / block time was empty. Will try again soon..."
+            msg nots "$_LN"
+            sleep 10
+            continue
+        fi
+
         seconds_behind=$(compare_dates "$(rfc_datetime)" "$block_time")
         time_behind="$(human_seconds "${seconds_behind}")"
 
@@ -1842,21 +1859,37 @@ siab-monitor() {
             mins_since_start=$((time_since_start / 60))
             msg green "Blocks per second:           $bps"
 
+            error_control 1
             remote_props=$(rpc-global-props "$REMOTE_RPC")
-            remote_head_block=$(echo "$remote_props" | jq -r '.result.head_block_number')
-            msg green "Latest network block:        $remote_head_block (from RPC $REMOTE_RPC)"
+            ret=$?
+            if (( ret == 0 )); then
+                remote_head_block=$(echo "$remote_props" | jq -r '.result.head_block_number')
+                if [ -z "$remote_head_block" ]; then
+                    msg bold red "Remote RPC head block / block time was empty. Will try again soon..."
+                    msg nots "$_LN"
+                    sleep 10
+                    continue
+                fi
+                msg green "Latest network block:        $remote_head_block (from RPC $REMOTE_RPC)"
 
-            blocks_behind=$(( remote_head_block - head_block ))
-            mins_remaining=$(( (blocks_behind / bps) / 60 ))
-            msg green "Blocks behind:               $blocks_behind"
-            msg green "ETA til Synced:              $mins_remaining minutes"
-            if (( mins_since_start > 0 )); then
-                bpm=$(( blocks_synced / (time_since_start / 60) ))
-                msg green "Blocks per minute:           $bpm"
+                blocks_behind=$(( remote_head_block - head_block ))
+                mins_remaining=$(( (blocks_behind / bps) / 60 ))
+                msg green "Blocks behind:               $blocks_behind"
+                msg green "ETA til Synced:              $mins_remaining minutes"
+                if (( mins_since_start > 0 )); then
+                    bpm=$(( blocks_synced / (time_since_start / 60) ))
+                    msg green "Blocks per minute:           $bpm"
+                fi
+            else
+                msg bold red "Error while obtaining Remote RPC global props. Will try again soon..."
+                msg nots "$_LN"
+                sleep 10
+                continue
             fi
+            
             msg
         fi
-        msg nots "======================================================================"
+        msg nots "$_LN"
         sleep 10
     done
 }
