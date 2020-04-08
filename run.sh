@@ -133,7 +133,7 @@ if [[ -f .env ]]; then
     source .env
 fi
 
-: ${NETWORK="steem"}
+: ${NETWORK="hive"}
 
 
 if [[ "$NETWORK" == "hive" ]]; then
