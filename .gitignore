@@ -1,12 +1,17 @@
 data/witness_node_data_dir/config.ini*
 data/witness_node_data_dir/database.cfg
+data/rocksdb/
+data/witness_node_data_dir/rocksdb*
+
 .vscode
 .idea
 .DS_Store
 .env
+
 data/advanced_benchmark.json
 data/r_advanced_benchmark.json
 rocksdb*
 
 dkr_local/src/
+.rsync-partial/
 

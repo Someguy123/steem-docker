@@ -34,3 +34,17 @@ get_latest_id() {
     jq -r ".config.digest" <<< "$curl_data"
 }
 
+# get_container_ip [container_name_or_id]
+# example:
+#   ip=$(get_container_ip "my_container")
+#   echo $ip   # outputs: 172.17.0.2
+#
+get_container_ip() {
+    local ct_name="seed"
+
+    (( $# > 0 )) && ct_name="$1"
+
+    docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$ct_name"
+}
+
+
