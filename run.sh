@@ -1343,8 +1343,8 @@ install() {
     sleep 2
     msg yellow " -> Loading image from ${DK_TAG}"
     docker pull "$DK_TAG"
-    msg green " -> Tagging as steem"
-    docker tag "$DK_TAG" steem
+    msg green " -> Tagging as ${DOCKER_IMAGE}"
+    docker tag "$DK_TAG" "${DOCKER_IMAGE}"
     msg bold green " -> Installation completed. You may now configure or run the server"
 }
 
