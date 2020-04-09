@@ -1618,6 +1618,15 @@ pclogs() {
     done
 }
 
+# Original grep/sed snippet made by @drakos
+clean-logs() {
+    msgerr cyan "Monitoring and cleaning replay logs for ${DOCKER_NAME}"
+
+    docker logs --tail=5000000 -f -t "$DOCKER_NAME" | \
+        grep -E '[0-9]{2}%.*M free|[0-9]{2}%.*objects cached|Performance report at block|Done reindexing|Migrating state to disk|Converting index.*to mira type' | \
+        sed -e "s/\r\x1B\[0m//g"
+}
+
 # Usage: ./run.sh tslogs
 # (warning: may require root to work properly in some cases)
 # Shows the Steem logs, but with UTC timestamps extracted from the docker logs.
@@ -2208,6 +2217,9 @@ case $1 in
         ;;
     tslogs)
         tslogs
+        ;;
+    clean_logs|cleanlogs|clean-logs)
+        clean-logs
         ;;
     ver|version)
         ver
