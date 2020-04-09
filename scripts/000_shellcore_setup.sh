@@ -15,6 +15,16 @@
 #
 #####################################################################################################
 
+_XDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "${_XDIR}/core.sh"
+
+SIAB_LIB_LOADED[shellcoresetup]=1 # Mark this library script as loaded successfully
+
+# Check that both SIAB_LIB_LOADED and SIAB_LIBS exist. If one of them is missing, then detect the folder where this
+# script is located, and then source map_libs.sh using a relative path from this script.
+# array-exists() { declare -p "$1" &> /dev/null; }
+# { ! array-exists SIAB_LIB_LOADED || ! array-exists SIAB_LIBS ; } && source "${_XDIR}/siab_libs.sh" || true
+
 
 # returns 0 if version $1 > $2
 #   if version_gt 1.1.0 1.0.0; then 

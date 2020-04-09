@@ -30,7 +30,10 @@ SIAB_MIN_SC_VER="0.4.3"
 # Global variable used by 000_shellcore_setup:_sc_force_update to inform run.sh if it needs to restart the script
 _SIAB_RELOAD=0
 
+source "${SIAB_DIR}/scripts/siab_libs.sh"
 source "${SIAB_DIR}/scripts/000_shellcore_setup.sh"
+
+siab_load_lib shellcoresetup
 
 _setup_shellcore
 
@@ -99,6 +102,33 @@ siab_exit() {
     exit $error_code
 }
 
+CLEANUP_FILES=()
+CLEANUP_FOLDERS=()
+
+siab_cleanup() {
+    local path_len f
+    for f in "${CLEANUP_FILES[@]}"; do
+        path_len=$(len "$f")
+        if (( path_len < 5 )); then
+            msgerr bold yellow "WARNING: Not cleaning up leftover file '$f' as path is shorter than 5 chars."
+            msgerr bold yellow "         This is to prevent accidental deletion of important system files."
+        else
+            _debug "Removing leftover file: $f"
+            rm "$f"
+        fi
+    done
+    for f in "${CLEANUP_FOLDERS[@]}"; do
+        path_len=$(len "$f")
+        if (( path_len < 5 )); then
+            msgerr bold yellow "WARNING: Not cleaning up leftover folder '$f' as path is shorter than 5 chars."
+            msgerr bold yellow "         This is to prevent accidental deletion of important system folders."
+        else
+            _debug "Removing leftover folder: $f"
+            rm -r "$f"
+        fi
+    done
+}
+
 siab_abort() {
     local error_code="$?" s_line="$1" s_cmd="$2" s_signal="$3"
     msg "\n"
@@ -133,6 +163,7 @@ if [[ -f .env ]]; then
     source .env
 fi
 
+: ${CONFIG_FILE="${DATADIR}/witness_node_data_dir/config.ini"}
 : ${NETWORK="hive"}
 
 
@@ -291,7 +322,9 @@ export -f msg
 export RED GREEN YELLOW BLUE BOLD NORMAL RESET
 
 # load helpers
-source "${SIAB_DIR}/scripts/010_helpers.sh"
+# source "${SIAB_DIR}/scripts/010_helpers.sh"
+
+siab_load_lib helpers docker stateshot
 
 # if the config file doesn't exist, try copying the example config
 if [[ ! -f "$CONF_FILE" ]]; then
@@ -337,7 +370,9 @@ for i in $PORTS; do
 done
 
 # load docker hub API
-source "${SIAB_DIR}/scripts/030_docker.sh"
+# source "${SIAB_DIR}/scripts/030_docker.sh"
+
+# source "${SIAB_DIR}/scripts/040_stateshot.sh"
 
 help() {
     echo "Usage: $0 COMMAND [DATA]"
@@ -2155,6 +2190,9 @@ case $1 in
         ;;
     monitor)
         siab-monitor "${@:2}"
+        ;;
+    stateshot)
+        install-stateshot "${@:2}"
         ;;
     enter)
         enter

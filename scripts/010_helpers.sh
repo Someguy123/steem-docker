@@ -9,10 +9,27 @@
 #
 #####################################################################################################
 
+_XDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "${_XDIR}/core.sh"
+
+SIAB_LIB_LOADED[helpers]=1 # Mark this library script as loaded successfully
+
+# return 0 if array (i.e. x=() ) exists, otherwise return 1
+array-exists() { declare -p "$1" &> /dev/null; }
+
+_XDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Check that both SIAB_LIB_LOADED and SIAB_LIBS exist. If one of them is missing, then detect the folder where this
+# script is located, and then source map_libs.sh using a relative path from this script.
+array-exists() { declare -p "$1" &> /dev/null; }
+{ ! array-exists SIAB_LIB_LOADED || ! array-exists SIAB_LIBS ; } && source "${_XDIR}/siab_libs.sh" || true
+SIAB_LIB_LOADED[helpers]=1 # Mark this library script as loaded successfully
+
+
 rfc_datetime() {
     TZ='UTC' date +'%Y-%m-%dT%H:%M:%S'
 }
-OS_NAME=$(uname -s)
+OS_NAME="$(uname -s)"
 
 # date_to_seconds [date_time] 
 # for most reliable conversion, pass date/time in ISO format:
@@ -72,3 +89,23 @@ human_seconds() {
         echo "$m"
     fi
 }
+
+# return 0 if array (i.e. x=() ) exists, otherwise return 1
+array-exists() { declare -p "$1" &> /dev/null; }
+
+# create and output path to a temporary file - like mktemp
+# adds temporary file to CLEANUP_FILES for automatic cleanup
+#
+#   my_tmpfile=$(add-tmpfile)
+#   echo "hello world" > "$my_tmpfile"
+#
+add-tmpfile() {
+    local tmpf
+    tmpf="$(mktemp)"
+    if ! array-exists CLEANUP_FILES; then CLEANUP_FILES=(); fi
+    CLEANUP_FILES+=("$tmpf")
+    echo "$tmpf"
+}
+
+add-tempfile() { add-tmpfile; }
+

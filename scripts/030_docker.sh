@@ -1,3 +1,18 @@
+#!/usr/bin/env bash
+
+_XDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "${_XDIR}/core.sh"
+SIAB_LIB_LOADED[docker]=1 # Mark this library script as loaded successfully
+
+_XDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Check that both SIAB_LIB_LOADED and SIAB_LIBS exist. If one of them is missing, then detect the folder where this
+# script is located, and then source map_libs.sh using a relative path from this script.
+array-exists() { declare -p "$1" &> /dev/null; }
+{ ! array-exists SIAB_LIB_LOADED || ! array-exists SIAB_LIBS ; } && source "${_XDIR}/siab_libs.sh" || true
+SIAB_LIB_LOADED[docker]=1 # Mark this library script as loaded successfully
+
+
 registryBase='https://registry-1.docker.io'
 authBase='https://auth.docker.io'
 authService='registry.docker.io'
