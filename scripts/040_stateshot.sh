@@ -63,6 +63,21 @@ stateshot-read() {
     set -u
 }
 
+# stateshot-has-key [var name] [stateshot filename]
+# 
+#   if stateshot-has-key "ACC_HIST_RDB" hive-acchist-lowmem; then
+#       echo "hive-acchist-lowmem has the config key 'ACC_HIST_RDB'"
+#   else
+#       echo "hive-acchist-lowmem DOES NOT have the config key 'ACC_HIST_RDB'"
+#   fi
+#
+stateshot-has-key() {
+    local varname="$1" vardef="" sfile="$STATESHOT_DEFAULT"
+    (( $# > 1 )) && sfile="$2"
+
+    grep -qE "^${varname} ?= ?" "${STATESHOTS[$sfile]}"
+}
+
 # _get-stateshot-line [var name] [var default] [stateshot filename]
 # 
 #   $ _get-stateshot-line DESCRIPTION "no DESCRIPTION value set" hive-witness-seed.sh
@@ -141,7 +156,12 @@ get-stateshot-mira() {
 
 get-stateshot-lowmem() {
     local sfile="$STATESHOT_DEFAULT"; (( $# > 0 )) && sfile="$1"
-    _get-stateshot-line LOW_MEMORY_MODE "1" "$sfile"
+    _get-stateshot-line LOW_MEMORY "1" "$sfile"
+}
+
+get-stateshot-acchist-rdb() {
+    local sfile="$STATESHOT_DEFAULT"; (( $# > 0 )) && sfile="$1"
+    _get-stateshot-line ACC_HIST_RDB "" "$sfile"
 }
 
 ########
@@ -202,27 +222,30 @@ _stateshot-show() {
     ss_plugins=$(get-stateshot-plugins "$ss_select") ss_lowmem=$(get-stateshot-lowmem "$ss_select")
     ss_mira=$(get-stateshot-mira "$ss_select") ss_blocksrc=$(get-stateshot-blocksrc "$ss_select")
     ss_blocksize=$(get-stateshot-blocksize "$ss_select") ss_blockindex=$(get-stateshot-blockindex "$ss_select")
-    ss_shmsrc=$(get-stateshot-shmsrc "$ss_select")
+    ss_shmsrc=$(get-stateshot-shmsrc "$ss_select")       ss_hist_rdb="$(get-stateshot-acchist-rdb "$ss_select")"
 
     msg
     msg cyan "Stateshot: $ss_select \n"
-    msg cyan "     Description:           $ss_desc"
-    msg cyan "     Docker Image:          $ss_image"
+    msg cyan "     Description:               $ss_desc"
+    msg cyan "     Docker Image:              $ss_image"
     if (( ss_mira == 1 )); then
-        msg cyan "     MIRA:                  ${GREEN}YES"
+        msg cyan "     MIRA:                      ${GREEN}YES"
     else
-        msg cyan "     MIRA:                  ${RED}NO"
+        msg cyan "     MIRA:                      ${RED}NO"
     fi
     if (( ss_lowmem == 1 )); then
-        msg cyan "     Low Memory Mode:       ${GREEN}YES"
+        msg cyan "     Low Memory Mode:           ${GREEN}YES"
     else
-        msg cyan "     Low Memory Mode:       ${RED}NO"
+        msg cyan "     Low Memory Mode:           ${RED}NO"
     fi
-    msg cyan "     Plugins:               $ss_plugins"
-    msg cyan "     Block Log:             $ss_blocksrc"
-    msg cyan "     Block Log Size:        $ss_blocksize"
-    msg cyan "     Block Index:           $ss_blockindex"
-    msg cyan "     RocksDB/Shared Mem:    $ss_shmsrc"
+    msg cyan "     Plugins:                   $ss_plugins"
+    msg cyan "     Block Log:                 $ss_blocksrc"
+    msg cyan "     Block Log Size:            $ss_blocksize"
+    msg cyan "     Block Index:               $ss_blockindex"
+    msg cyan "     RocksDB/Shared Mem:        $ss_shmsrc"
+    if stateshot-has-key "ACC_HIST_RDB" "$ss_select"; then
+        msg cyan "     Account Hist (RocksDB):    $ss_hist_rdb"
+    fi
 }
 
 detect-download-method() {
@@ -318,7 +341,8 @@ install-stateshot() {
 
     _stateshot-show "$ss_select"
 
-    if yesno "Do you want to install this stateshot? (y/n) > "; then
+    msg
+    if yesno "${MAGENTA}Do you want to install this stateshot?${RESET} (y/n) > "; then
         msg
         msg purple " [...] Adjusting your plugins in config: $CONFIG_FILE"
         config_set "plugin" "$ss_plugins"
@@ -363,6 +387,11 @@ install-stateshot() {
 
         msg bold green "\n [...] Downloading chain state files (shared_memory / rocksdb) from '${ss_shmsrc}' into: ${SHM_DIR} ... \n"
         rsync -Irvh --delete --inplace --progress "$ss_shmsrc" "${SHM_DIR}/"
+
+        if stateshot-has-key "ACC_HIST_RDB" "$ss_select"; then
+            msg bold green "\n [...] Downloading RocksDB account history from '${ss_hist_rdb}' into: ${BC_FOLDER}/account-history-rocksdb-storage/ ... \n"
+            rsync -Irvh --delete --inplace --progress "${ss_hist_rdb}" "${BC_FOLDER}/account-history-rocksdb-storage/"
+        fi
         msg
         msg bold green "\n [+++] Finished setting up StateShot '$ss_select' "
         msg bold green "\n [+++] Please make sure to check your config file for any errors at: $CONFIG_FILE "
