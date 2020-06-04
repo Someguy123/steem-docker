@@ -2096,7 +2096,7 @@ siab-monitor() {
             ret=$?
             if (( ret == 0 )); then
                 remote_head_block=$(echo "$remote_props" | jq -r '.result.head_block_number')
-                if [ -z "$remote_head_block" ]; then
+                if [ -z "$remote_head_block" ] || [[ "$remote_head_block" == "null" ]]; then
                     msg bold red "Remote RPC head block / block time was empty. Will try again soon..."
                     msg nots "$_LN"
                     sleep "$MONITOR_INTERVAL"
