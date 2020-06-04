@@ -158,6 +158,13 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 : ${DATADIR="$DIR/data"}
 : ${DOCKER_NAME="seed"}
 
+STEEM_RUN_ARGS=()
+STEEM_RUN_ARGS_EXTRA=()
+DKR_RUN_ARGS=()
+: "${DKR_DRY_RUN=0}"
+DKR_VOLUMES=() EXTRA_VOLUMES=()
+
+STEEM_REPLAY_ARGS=()
 
 if [[ -f .env ]]; then
     source .env
@@ -188,7 +195,22 @@ if [[ "$NETWORK" == "hive" ]]; then
 
     : ${STOP_TIME=600}          # Amount of time in seconds to allow the docker container to stop before killing it.
     : ${STEEM_RPC_PORT="8091"}  # Local steemd RPC port, used by commands such as 'monitor' which need to query your steemd's HTTP RPC
+
+    : ${DKR_DATA_MOUNT="/steem"}    # Mount $DATADIR onto this folder within the container
+    : ${DKR_SHM_MOUNT="/shm"}       # Mount $SHM_DIR onto this folder within the container
+    : ${DKR_RUN_BIN="steemd"}       # Run this executable within the container
 fi
+
+
+: ${DKR_DATA_MOUNT="/steem"}    # Mount $DATADIR onto this folder within the container
+: ${DKR_SHM_MOUNT="/shm"}       # Mount $SHM_DIR onto this folder within the container
+: ${DKR_RUN_BIN="steemd"}       # Run this executable within the container
+
+# if (( ${#STEEM_RUN_ARGS[@]} == 0 )); then
+#     STEEM_RUN_ARGS+=("--data-dir=${DKR_DATA_MOUNT}/witness_node_data_dir")
+# fi
+
+(( ${#STEEM_RUN_ARGS_EXTRA[@]} > 0 )) && STEEM_RUN_ARGS+=("${STEEM_RUN_ARGS_EXTRA[@]}")
 
 # the tag to use when running/replaying steemd
 : ${DOCKER_IMAGE="steem"}
@@ -369,6 +391,19 @@ for i in $PORTS; do
     fi
 done
 
+
+if ! (( ${#DKR_VOLUMES[@]} )); then
+    DKR_VOLUMES=(
+        "${SHM_DIR}:${DKR_SHM_MOUNT}"
+        "${DATADIR}:${DKR_DATA_MOUNT}"
+    )
+fi
+
+if (( ${#EXTRA_VOLUMES[@]} )); then
+    IFS="," read -r -a _EXTRA_VOLS <<< "$EXTRA_VOLUMES"
+    DKR_VOLUMES+=("${_EXTRA_VOLS[@]}")
+fi
+
 # load docker hub API
 # source "${SIAB_DIR}/scripts/030_docker.sh"
 
@@ -482,7 +517,7 @@ parse_build_args() {
     
     msg blue " ++ CUSTOM BUILD SPECIFIED. Building from branch/tag ${BOLD}${BUILD_VER}"
     msg blue " ++ Tagging final image as: ${BOLD}${CUST_TAG}"
-    msg yellow " -> Docker build arguments: ${BOLD}${BUILD_ARGS[@]}"
+    msg yellow " -> Docker build arguments: ${BOLD}${BUILD_ARGS[*]}"
 }
 
 build_local() {
@@ -1346,7 +1381,7 @@ install_docker() {
     curl https://get.docker.com | sh
     if [ "$EUID" -ne 0 ]; then 
         echo "Adding user $(whoami) to docker group"
-        sudo usermod -aG docker $(whoami)
+        sudo usermod -aG docker "$(whoami)"
         echo "IMPORTANT: Please re-login (or close and re-connect SSH) for docker to function correctly"
     fi
 }
@@ -1401,11 +1436,11 @@ install_full() {
 # if seed_exists; then echo "true"; else "false"; fi
 #
 seed_exists() {
-    seedcount=$(docker ps -a -f name="^/"$DOCKER_NAME"$" | wc -l)
+    seedcount=$(docker ps -a -f name="^/${DOCKER_NAME}$" | wc -l)
     if [[ $seedcount -eq 2 ]]; then
         return 0
     else
-        return -1
+        return 1
     fi
 }
 
@@ -1415,29 +1450,168 @@ seed_exists() {
 # if seed_running; then echo "true"; else "false"; fi
 #
 seed_running() {
-    seedcount=$(docker ps -f 'status=running' -f name=$DOCKER_NAME | wc -l)
+    seedcount=$(docker ps -f 'status=running' -f "name=$DOCKER_NAME" | wc -l)
     if [[ $seedcount -eq 2 ]]; then
         return 0
     else
-        return -1
+        return 1
+    fi
+}
+
+# stop_seed_running [stop_or_exit=1]
+# If the container is running, alert the user and ask if they want to stop the container now.
+# By default, if the user says no, 'exit 1' will be called to terminate the script.
+#
+# If you pass 0 or 'no' as the first argument, then instead of force exiting, a warning will
+# be displayed to the user warning that not stopping the container is unsafe, and giving them
+# 10 seconds to press CTRL-C in-case they change their minds. Once the 10 second wait is over,
+# the function simply returns exit code 1, for the callee function to appropriately handle.
+#
+stop_seed_running() {
+    local stop_or_exit=1
+    (( $# > 0 )) && stop_or_exit="$1"
+    if seed_running; then
+        msgerr red "WARNING: Your $NETWORK_NAME server ($DOCKER_NAME) is currently running"
+        echo
+        docker ps
+        echo
+        if yesno "Do you want to stop the container now? (y/n) > "; then
+            stop
+        elif [[ "$stop_or_exit" == "y" || "$stop_or_exit" == "yes" ]] || (( stop_or_exit )); then
+            msg yellow "You said no. Cannot continue safely without stopping the container first. Aborting."
+            exit 1
+        else
+            msg bold yellow "WARNING: Attempting requested action without stopping container. Bad things may happen!"
+            msg bold yellow "Hit CTRL-C to abort. Otherwise, will continue in 10 seconds..."
+            sleep 10
+            return 1
+        fi
+    else
+        return 0
+    fi
+}
+
+# remove_seed_exists [stop_or_exit=1]
+# Remove the container DOCKER_NAME if it exists, calling 'stop_seed_running' beforehand to ensure
+# that the container is stopped.
+# 
+# The first argument, 'stop_or_exit' is passed through to stop_seed_running. See comments for
+# that function for info on that.
+remove_seed_exists() {
+    local stop_or_exit=1
+    (( $# > 0 )) && stop_or_exit="$1"
+    stop_seed_running "$stop_or_exit"
+
+    if seed_exists; then
+        msg yellow " -> Removing old container '${DOCKER_NAME}'"
+        docker rm "$DOCKER_NAME"
+    fi
+}
+
+
+# docker_run_node [steemd extra arguments]
+# Create and start a container to run DKR_RUN_BIN (usually `steemd`), appending any arguments from this
+# function to the steemd command line arguments.
+#
+# When ran without arguments, should produce a command which looks like:
+#   docker run -p 0.0.0.0:2001:2001 -v /hive/data:/steem -d --name $DOCKER_NAME
+#       -t $DOCKER_IMAGE steemd --data-dir=/steem/witness_node_data_dir
+docker_run_node() {
+    : "${DKR_RUN_ADD_DATA_DIR=1}"
+    local stm_run_args=()
+
+    (( DKR_RUN_ADD_DATA_DIR )) && stm_run_args+=("--data-dir=${DKR_DATA_MOUNT}/witness_node_data_dir")
+
+    stm_run_args+=("${STEEM_RUN_ARGS[@]}" "$@")
+    _docker_run "${DKR_RUN_BIN}" "${stm_run_args[@]}"
+}
+
+docker_run_wallet() {
+    local ws_node="$REMOTE_WS"
+    (( $# > 0 )) && ws_node="$1"
+    _docker_int_autorm cli_wallet -s "$ws_node" "${@:2}"
+}
+
+# _docker_run_base [image_executable] [exe_args]
+# Works the same as _docker_run, but defaults the following env variables to 0 instead
+# of the default 1 set by _docker_run:
+#
+#   RUN_DETACHED DKR_USE_NAME DKR_MOUNT_VOLS DKR_EXPOSE_PORTS
+#
+_docker_run_base() {
+    : "${RUN_DETACHED=0}"
+    : "${DKR_USE_NAME=0}"
+    : "${DKR_MOUNT_VOLS=0}"
+    : "${DKR_EXPOSE_PORTS=0}"
+    _docker_run "$@"
+}
+
+# _docker_int_autorm [image_executable] [exe_args]
+# _docker_run_base wrapper for "interactive auto-removing" containers.
+# Mostly the same as _docker_run_base, except DKR_MOUNT_VOLS defaults to 1,
+# and the docker args '--rm' and '-i' are appended to DKR_RUN_ARGS
+_docker_int_autorm() {
+    : "${DKR_MOUNT_VOLS=1}"
+    DKR_RUN_ARGS=("--rm" "-i")
+    _docker_run_base "$@"
+}
+
+# _docker_run [image_executable] [exe_args]
+# Creates and starts a docker container with `docker run`, while automatically
+# building parts of the command for mounting volumes / exposing ports etc. 
+# based on env vars such as `DKR_VOLUMES`, `DPORTS`, and others.
+#
+# Example:
+#   _docker_run steemd --data-dir=/steem/witness_node_data_dir
+#   RUN_DETACHED=0 DKR_USE_NAME=0 DKR_EXPOSE_PORTS=0 _docker_run cli_wallet -s "wss://hived.privex.io"
+#
+_docker_run() {
+    local x_run_args=("$@")
+
+    _CMD=(
+        docker run
+    )
+    : "${RUN_DETACHED=1}"
+    : "${DKR_USE_NAME=1}"
+    : "${DKR_MOUNT_VOLS=1}"
+    : "${DKR_EXPOSE_PORTS=1}"
+
+    (( DKR_EXPOSE_PORTS )) && _CMD+=("${DPORTS[@]}")
+    
+    if (( DKR_MOUNT_VOLS )); then
+        # Iterate over DKR_VOLUMES to generate docker volume mount arguments
+        for v in "${DKR_VOLUMES[@]}"; do
+            _CMD+=("-v" "$v")
+        done
+    fi
+
+
+    (( RUN_DETACHED )) && _CMD+=('-d')
+    (( ${#DKR_RUN_ARGS[@]} > 0 )) && _CMD+=("${DKR_RUN_ARGS[@]}")
+
+    (( DKR_USE_NAME )) && _CMD+=("--name" "$DOCKER_NAME")
+
+    _CMD+=("-t" "$DOCKER_IMAGE")
+
+    (( ${#x_run_args[@]} > 0 )) && _CMD+=("${x_run_args[@]}")
+
+    if (( DKR_DRY_RUN )); then
+        echo "Would've ran the following command:"
+        echo "${_CMD[@]}"
+    else
+        env "${_CMD[@]}"
     fi
 }
 
 # Usage: ./run.sh start
 # Creates and/or starts the Steem docker container
 start() {
+    remove_seed_exists 1
     msg bold green " -> Starting container '${DOCKER_NAME}'..."
-    seed_exists
-    if [[ $? == 0 ]]; then
-        docker start $DOCKER_NAME
-    else
-        if (( $# > 0 )); then
-            msg green "Appending extra arguments: $*"
-            docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir "$@"
-        else
-            docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir
-        fi
+    if (( $# > 0 )); then
+        msg green "Appending extra arguments: $*"
     fi
+    docker_run_node "$@"
 }
 
 # Usage: ./run.sh replay
@@ -1446,52 +1620,24 @@ start() {
 # so that it can stop and remove the old container
 #
 replay() {
-    seed_running
-    if [[ $? == 0 ]]; then
-        echo $RED"WARNING: Your Steem server ($DOCKER_NAME) is currently running"$RESET
-        echo
-        docker ps
-        echo
-        read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
-        if [[ "$shouldstop" == "y" ]]; then
-            stop
-        else
-            echo $GREEN"Did not say 'y'. Quitting."$RESET
-            return
-        fi
-    fi 
-    msg yellow " -> Removing old container '${DOCKER_NAME}'"
-    docker rm $DOCKER_NAME
-    if (( $# > 0 )); then
-        msg green " -> Running steem (image: ${DOCKER_IMAGE}) with replay in container '${DOCKER_NAME}' - extra args: '$*'..."
-        docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir --replay "$@"
-    else
-        msg green " -> Running steem (image: ${DOCKER_IMAGE}) with replay in container '${DOCKER_NAME}'..."
-        docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir --replay
-    fi
+    remove_seed_exists 1
+    local p_msg=" -> Running $NETWORK_NAME (image: ${DOCKER_IMAGE}) with replay in container '${DOCKER_NAME}'"
+    (( $# > 0 )) && p_msg+=" - extra args: '$*'..." || p_msg+="..."
+    msg green "$p_msg"
+    docker_run_node --replay "$@"
     msg bold green " -> Started."
 }
 
-# For MIRA, replay with --memory-replay
+# For MIRA, you can replay with --memory-replay to tell steemd to store as much chainstate as it can in memory,
+# instead of constantly reading/writing it to the disk RocksDB files.
+# WARNING: Consumes a ridiculous amount of memory compared to standard MIRA replay and non-MIRA replay
+# (somewhere around 120GB for low memory mode with basic plugins...)
 memory_replay() {
-    seed_running
-    if [[ $? == 0 ]]; then
-        echo $RED"WARNING: Your Steem server ($DOCKER_NAME) is currently running"$RESET
-	echo
-        docker ps
-	echo
-	read -p "Do you want to stop the container and replay? (y/n) > " shouldstop
-    if [[ "$shouldstop" == "y" ]]; then
-		stop
-	else
-		echo $GREEN"Did not say 'y'. Quitting."$RESET
-		return
-	fi
-    fi 
+    remove_seed_exists 1
     echo "Removing old container"
-    docker rm $DOCKER_NAME
-    echo "Running steem with --memory-replay..."
-    docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem -d --name $DOCKER_NAME -t "$DOCKER_IMAGE" steemd --data-dir=/steem/witness_node_data_dir --replay --memory-replay
+    docker rm "$DOCKER_NAME"
+    echo "Running ${NETWORK_NAME} with --memory-replay..."
+    docker_run_node --replay --memory-replay "$@"
     echo "Started."
 }
 
@@ -1500,12 +1646,11 @@ memory_replay() {
 # Size should be specified with G (gigabytes), e.g. ./run.sh shm_size 64G
 #
 shm_size() {
-    if (( $# != 1 )); then
+    if (( $# < 1 )); then
         msg red "Please specify a size, such as ./run.sh shm_size 64G"
     fi
     msg green " -> Setting /dev/shm to $1"
-    sudo mount -o remount,size=$1 /dev/shm
-    if [[ $? -eq 0 ]]; then
+    if sudo mount -o "remount,size=$1" /dev/shm; then
         msg bold green "Successfully resized /dev/shm"
     else
         msg bold red "An error occurred while resizing /dev/shm..."
@@ -1522,7 +1667,7 @@ stop() {
     msg red "Stopping container '${DOCKER_NAME}' (allowing up to ${STOP_TIME} seconds before killing)..."
     docker stop -t ${STOP_TIME} $DOCKER_NAME
     msg red "Removing old container '${DOCKER_NAME}'..."
-    docker rm $DOCKER_NAME
+    docker rm "$DOCKER_NAME"
 }
 
 sbkill() {
@@ -1545,7 +1690,8 @@ enter() {
 # To avoid leftover containers, it uses `--rm` to remove the container once you exit.
 #
 shell() {
-    docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem --rm -it "$DOCKER_IMAGE" bash
+    _docker_int_autorm bash
+    # docker run ${DPORTS[@]} -v "$SHM_DIR":/shm -v "$DATADIR":/steem --rm -it "$DOCKER_IMAGE" bash
 }
 
 
@@ -1567,10 +1713,13 @@ wallet() {
 #    wss_server - a custom websocket server to connect to, e.g. ./run.sh remote_wallet wss://rpc.steemviz.com
 #
 remote_wallet() {
-    if (( $# == 1 )); then
-        REMOTE_WS=$1
+    if (( $# >= 1 )); then
+        REMOTE_WS="$1"
     fi
-    docker run -v "$DATADIR":/steem --rm -it "$DOCKER_IMAGE" cli_wallet -s "$REMOTE_WS"
+    # DKR_RUN_ARGS="--rm -i" RUN_DETACHED=0 DKR_RUN_ADD_DATA_DIR=0 
+    # DKR_RUN_BIN="cli_wallet"
+    # docker run -v "$DATADIR":/steem --rm -it "$DOCKER_IMAGE" cli_wallet -s "$REMOTE_WS"
+    docker_run_wallet "$REMOTE_WS"
 }
 
 # Usage: ./run.sh logs
@@ -1578,7 +1727,7 @@ remote_wallet() {
 #
 logs() {
     msg blue "DOCKER LOGS: (press ctrl-c to exit) "
-    docker logs -f --tail=30 $DOCKER_NAME
+    docker logs -f --tail=30 "$DOCKER_NAME"
     #echo $RED"INFO AND DEBUG LOGS: "$RESET
     #tail -n 30 $DATADIR/{info.log,debug.log}
 }
@@ -1596,19 +1745,19 @@ pclogs() {
         sudo apt-get update -y > /dev/null
         sudo apt-get install -y jq > /dev/null
     fi
-    local LOG_PATH=$(docker inspect $DOCKER_NAME | jq -r .[0].LogPath)
-    local pipe=/tmp/dkpipepc.fifo
-    trap "rm -f $pipe" EXIT
-    if [[ ! -p $pipe ]]; then
-        mkfifo $pipe
+    local LOG_PATH=$(docker inspect "$DOCKER_NAME" | jq -r .[0].LogPath)
+    local pipe="$(mktemp).fifo"
+    trap "rm -f '$pipe'" EXIT
+    if [[ ! -p "$pipe" ]]; then
+        mkfifo "$pipe"
     fi
     # the sleep is a dirty hack to keep the pipe open
 
-    sleep 1000000 < $pipe &
-    tail -n 5000 -f "$LOG_PATH" &> $pipe &
+    sleep 1000000 < "$pipe" &
+    tail -n 5000 -f "$LOG_PATH" &> "$pipe" &
     while true
     do
-        if read -r line <$pipe; then
+        if read -r line <"$pipe"; then
             # first grep the data for "objects cached" to avoid
             # needlessly processing the data
             L=$(egrep --colour=never "objects cached|M free" <<< "$line")
@@ -1653,19 +1802,19 @@ tslogs() {
         sudo apt update
         sudo apt install -y jq
     fi
-    local LOG_PATH=$(docker inspect $DOCKER_NAME | jq -r .[0].LogPath)
-    local pipe=/tmp/dkpipe.fifo
-    trap "rm -f $pipe" EXIT
-    if [[ ! -p $pipe ]]; then
-        mkfifo $pipe
+    local LOG_PATH=$(docker inspect "$DOCKER_NAME" | jq -r .[0].LogPath)
+    local pipe="$(mktemp).fifo"
+    trap "rm -f '$pipe'" EXIT
+    if [[ ! -p "$pipe" ]]; then
+        mkfifo "$pipe"
     fi
     # the sleep is a dirty hack to keep the pipe open
 
-    sleep 10000 < $pipe &
-    tail -n 100 -f "$LOG_PATH" &> $pipe &
+    sleep 10000 < "$pipe" &
+    tail -n 100 -f "$LOG_PATH" &> "$pipe" &
     while true
     do
-        if read -r line <$pipe; then
+        if read -r line <"$pipe"; then
             # first, parse the line and print the time + log
             L=$(jq -r ".time +\" \" + .log" <<<"$line")
             # then, remove excessive \r's causing multiple line breaks
@@ -1693,7 +1842,7 @@ simplecommitlog() {
     if [[ "$#" -lt 1 ]]; then
         echo "Usage: simplecommitlog branch [num_commits]"
         echo "invalid use of simplecommitlog. exiting"
-        exit -1
+        exit 1
     fi
     branch="$1"
     args="$branch"
@@ -1716,7 +1865,7 @@ ver() {
     # Also get the branch to warn people if they're not on master
     ####
     git remote update >/dev/null
-    current_branch=$(git branch | grep \* | cut -d ' ' -f2)
+    current_branch=$(git branch | grep '\*' | cut -d ' ' -f2)
     git_update=$(git status -uno)
 
 
@@ -1724,7 +1873,7 @@ ver() {
     # Print out the current branch, commit and check upstream 
     # to return commits that can be pulled
     ####
-    echo "${BLUE}Current Steem-in-a-box version:${RESET}"
+    echo "${BLUE}Current ${SELF_NAME} version:${RESET}"
     echo "    Branch: $current_branch"
     if [[ "$current_branch" != "master" ]]; then
         echo "${RED}WARNING: You're not on the master branch. This may prevent you from updating${RESET}"
@@ -1739,7 +1888,7 @@ ver() {
         fi
     done <<< "$git_status"
     if [[ "$modified" -ne 0 ]]; then
-        echo "    ${RED}ERROR: Your steem-in-a-box core files have been modified (see 'git status'). You will not be able to update."
+        echo "    ${RED}ERROR: Your ${SELF_NAME} core files have been modified (see 'git status'). You will not be able to update."
         echo "    Fix: Run 'git reset --hard' to reset all core files back to their originals before updating."
         echo "    This will not affect your running witness, or files such as config.ini which are supposed to be edited by the user${RESET}"
     fi
@@ -1749,26 +1898,26 @@ ver() {
     echo
     # Check for updates and let user know what's new
     if grep -Eiq "up.to.date" <<< "$git_update"; then
-        echo "    ${GREEN}Your steem-in-a-box core files (run.sh, Dockerfile etc.) up to date${RESET}"
+        echo "    ${GREEN}Your ${SELF_NAME} core files (run.sh, Dockerfile etc.) up to date${RESET}"
     else
-        echo "    ${RED}Your steem-in-a-box core files (run.sh, Dockerfile etc.) are outdated!${RESET}"
+        echo "    ${RED}Your ${SELF_NAME} core files (run.sh, Dockerfile etc.) are outdated!${RESET}"
         echo
-        echo "    ${BLUE}Updates in the current published version of Steem-in-a-box:${RESET}"
+        echo "    ${BLUE}Updates in the current published version of ${SELF_NAME}:${RESET}"
         simplecommitlog "HEAD..origin/master"
         echo
         echo
-        echo "    Fix: ${YELLOW}Please run 'git pull' to update your steem-in-a-box. This should not affect any running containers.${RESET}"
+        echo "    Fix: ${YELLOW}Please run 'git pull' to update your ${SELF_NAME}. This should not affect any running containers.${RESET}"
     fi
     echo $LINE
 
     ####
     # Show the currently installed image information
     ####
-    echo "${BLUE}Steem image installed:${RESET}"
+    echo "${BLUE}Hive/Steem image installed:${RESET}"
     # Pretty printed docker image ID + creation date
-    dkimg_output=$(docker images -f "reference=steem:latest" --format "Tag: {{.Repository}}, Image ID: {{.ID}}, Created At: {{.CreatedSince}}")
+    dkimg_output=$(docker images -f "reference=${DOCKER_IMAGE}:latest" --format "Tag: {{.Repository}}, Image ID: {{.ID}}, Created At: {{.CreatedSince}}")
     # Just the image ID
-    dkimg_id=$(docker images -f "reference=steem:latest" --format "{{.ID}}")
+    dkimg_id=$(docker images -f "reference=${DOCKER_IMAGE}:latest" --format "{{.ID}}")
     # Used later on, for commands that depend on the image existing
     got_dkimg=0
     if [[ $(wc -c <<< "$dkimg_output") -lt 10 ]]; then
@@ -1782,13 +1931,13 @@ ver() {
         if [[ "$?" == 0 ]]; then
             remote_docker_id="${remote_docker_id:7:12}"
             if [[ "$remote_docker_id" != "$dkimg_id" ]]; then
-                echo "    ${YELLOW}An update is available for your Steem installation"
+                echo "    ${YELLOW}An update is available for your ${NETWORK_NAME} server docker image"
                 echo "    Your image ID: $dkimg_id    Image ID on Docker Hub: ${remote_docker_id}"
                 echo "    NOTE: If you have built manually with './run.sh build', your image will not match docker hub."
                 echo "    To update, use ./run.sh install - a replay may or may not be required (ask in #witness on steem.chat)${RESET}"
             else
                 echo "${GREEN}Your installed docker image ($dkimg_id) matches Docker Hub ($remote_docker_id)"
-                echo "You're running the latest version of Steem from @someguy123's builds${RESET}"
+                echo "You're running the latest version of ${NETWORK_NAME} from @someguy123's builds${RESET}"
             fi
         else
             echo "    ${YELLOW}An error occurred while checking for updates${RESET}"
@@ -1798,11 +1947,11 @@ ver() {
 
     echo $LINE
 
-    msg green "Build information for currently installed Steem image '${DOCKER_IMAGE}':"
+    msg green "Build information for currently installed ${NETWORK_NAME} image '${DOCKER_IMAGE}':"
 
-    docker run --rm -it "${DOCKER_IMAGE}" cat /steem_build.txt
-
-    echo "${BLUE}Steem version currently running:${RESET}"
+    # docker run --rm -it "${DOCKER_IMAGE}" cat /steem_build.txt
+    _docker_int_autorm cat /steem_build.txt
+    echo "${BLUE}${NETWORK_NAME} version currently running:${RESET}"
     # Verify that the container exists, even if it's stopped
     if seed_exists; then
         _container_image_id=$(docker inspect "$DOCKER_NAME" -f '{{.Image}}')
@@ -1812,11 +1961,11 @@ ver() {
         # If the docker image check was successful earlier, then compare the image to the current container 
         if [[ "$got_dkimg" == 1 ]]; then
             if [[ "$container_image_id" == "$dkimg_id" ]]; then
-                echo "    ${GREEN}Container $DOCKER_NAME is running image $container_image_id, which matches steem:latest ($dkimg_id)"
-                echo "    Your container will not change Steem version on restart${RESET}"
+                echo "    ${GREEN}Container $DOCKER_NAME is running image $container_image_id, which matches ${DOCKER_IMAGE}:latest ($dkimg_id)"
+                echo "    Your container will not change ${NETWORK_NAME} version on restart${RESET}"
             else
-                echo "    ${YELLOW}Warning: Container $DOCKER_NAME is running image $container_image_id, which DOES NOT MATCH steem:latest ($dkimg_id)"
-                echo "    Your container may change Steem version on restart${RESET}"
+                echo "    ${YELLOW}Warning: Container $DOCKER_NAME is running image $container_image_id, which DOES NOT MATCH ${DOCKER_IMAGE}:latest ($dkimg_id)"
+                echo "    Your container may change ${NETWORK_NAME} version on restart${RESET}"
             fi
         else
             echo "    ${YELLOW}Could not get installed image earlier. Skipping image/container comparison.${RESET}"
@@ -1826,10 +1975,10 @@ ver() {
         if grep -q "blockchain version" <<< "$l"; then
             echo "  " $(grep "blockchain version" <<< "$l")
         else
-            echo "    ${RED}Could not identify blockchain version. Not found in logs for '$DOCKER_NAME'${RESET}"
+            echo "    ${RED}Could not identify blockchain version. Not found in logs for '${DOCKER_NAME}'${RESET}"
         fi
     else
-        echo "    ${RED}Unfortunately your Steem container doesn't exist (start it with ./run.sh start or replay)..."
+        echo "    ${RED}Unfortunately your ${NETWORK_NAME} container doesn't exist (start it with ./run.sh start or replay)..."
         echo "    We can't identify your blockchain version unless the container has been started at least once${RESET}"
     fi
 
@@ -2157,7 +2306,7 @@ case $1 in
         replay "${@:2}"
         ;;
     memory_replay)
-        memory_replay
+        memory_replay "${@:2}"
         ;;
     shm_size)
         shm_size $2

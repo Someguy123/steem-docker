@@ -16,7 +16,8 @@ SIAB_LIB_LOADED[docker]=1 # Mark this library script as loaded successfully
 registryBase='https://registry-1.docker.io'
 authBase='https://auth.docker.io'
 authService='registry.docker.io'
-remote_image="someguy123/steem"
+: ${DK_TAG_BASE="someguy123/steem"}
+remote_image="$DK_TAG_BASE"
 
 get_docker_token() {
     if [[ ! $(command -v jq) ]]; then
