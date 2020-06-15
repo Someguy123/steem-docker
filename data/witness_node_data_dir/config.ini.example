@@ -19,23 +19,25 @@ shared-file-full-threshold = 9500
 shared-file-scale-rate = 1000
 
 # Target blocks to flush
-flush = 100000
+flush = 1000
 
 # P2P nodes to connect to on startup (may specify multiple times)
-p2p-seed-node = anyx.io:2001                        # @anyx (CA)
-p2p-seed-node = gtg.steem.house:2001                # @gtg (PL)
-p2p-seed-node = lafonasteem.com:2001                # @lafona (FR)
-p2p-seed-node = seed.roelandp.nl:2001               # @roelandp (FI)
-p2p-seed-node = seed.esteem.ws:2001                 # @good-karma (FI)
-#p2p-seed-node = 176.31.126.187:2001                 # @timcliff (FR)
-p2p-seed-node = seed.thecryptodrive.com:2001        # @thecryptodrive (FI)
-p2p-seed-node = 104.199.118.92:2001                 # @clayop (US?)
-p2p-seed-node = seed.steemviz.com:2001              # @ausbitbank (SE)
-p2p-seed-node = steem-seed.lukestokes.info:2001     # @lukestokes (SE)
-p2p-seed-node = node.mahdiyari.info:2001            # @mahdiyari (FI)
-p2p-seed-node = steemseed-fin.privex.io:2001        # @privex (FI)
-p2p-seed-node = steemseed-se.privex.io:2001         # @privex (SE)
-p2p-seed-node = seed.steemmonsters.com:2001         # @aggroed (SE)
+p2p-seed-node = hive-seed.arcange.eu:2001           #  @arcange         (BE, Wavre)          (ASN: Proximus NV)
+p2p-seed-node = anyx.io:2001                        #  @anyx            (CA)                 (ASN: OVH SAS)
+p2p-seed-node = seed.thecryptodrive.com:2001        #  @thecryptodrive  (DE, Esslingen)      (ASN: Hetzner Online GmbH)
+p2p-seed-node = seed.buildteam.io:2001              #  @buildteam       (DE)                 (ASN: Hetzner Online GmbH)
+p2p-seed-node = seed.hivekings.com:2001             #  @drakos          (DE, Nuremberg)      (ASN: Contabo GmbH)
+p2p-seed-node = gtg.steem.house:2001                #  @gtg             (PL)                 (ASN: OVH SAS)
+p2p-seed-node = seed.openhive.network:2001          #  @gtg             (PL)                 (ASN: OVH SAS)
+p2p-seed-node = seed.roelandp.nl:2001               #  @roelandp        (FI, Helsinki)       (ASN: Hetzner Online GmbH)
+p2p-seed-node = node.mahdiyari.info:2001            #  @mahdiyari       (FI, Helsinki)       (ASN: Hetzner Online GmbH)
+p2p-seed-node = hived.hive-engine.com:2001          #  @aggroed         (FI)                 (ASN: Hetzner Online GmbH)
+p2p-seed-node = hived.splinterlands.com:2001        #  @aggroed         (FI)                 (ASN: Hetzner Online GmbH)
+p2p-seed-node = rpc.ausbit.dev:2001                 #  @ausbitbank      (FI, Tuusula)        (ASN: Hetzner Online GmbH)
+p2p-seed-node = seed.chitty.me:2001                 #  @chitty          (FI)                 (ASN: Hetzner Online GmbH)
+p2p-seed-node = hiveseed-fin.privex.io:2001         #  @privex          (FI, Helsinki)       (ASN: Hetzner Online GmbH)
+p2p-seed-node = seed.liondani.com:2016              #  @liondani        (GB, Maidstone)      (ASN: HostDime.com, Inc.)
+p2p-seed-node = hiveseed-se.privex.io:2001          #  @privex          (SE, Stockholm)      (ASN: Privex Inc.)
 
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
@@ -62,7 +64,27 @@ webserver-ws-endpoint = 0.0.0.0:8090
 # api-user =
 
 # Plugin(s) to enable, may be specified multiple times
-plugin = witness condenser_api network_broadcast_api account_by_key database_api
+plugin = witness condenser_api network_broadcast_api database_api block_api
+# account_by_key is enabled by default - required to use 'get_witness' and 'get_account' in cli_wallet
+plugin = account_by_key account_by_key_api
+
+#####################
+# The plugins listed below this line are intended for account history / full nodes
+# You generally do not need to enable any of the below plugins for a normal witness / seed
+#####################
+
+#plugin = webserver p2p json_rpc
+#plugin = rc_api
+
+#plugin = account_history_rocksdb
+#plugin = account_history_api
+
+#plugin = reputation reputation_api
+#plugin = market_history market_history_api
+# NOTE: tags + follow plugins are deprecated in-place of Hivemind: https://gitlab.syncad.com/hive/hivemind
+#plugin = tags tags_api
+#plugin = follow follow_api
+
 
 # Defines a range of accounts to track as a json pair ["from","to"] [from,to)
 # track-account-range =
