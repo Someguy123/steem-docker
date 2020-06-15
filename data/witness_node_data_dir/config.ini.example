@@ -22,23 +22,20 @@ shared-file-scale-rate = 1000
 flush = 1000
 
 # P2P nodes to connect to on startup (may specify multiple times)
-p2p-seed-node = hive-seed.arcange.eu:2001           #  @arcange         (BE, Wavre)          (ASN: Proximus NV)
-p2p-seed-node = anyx.io:2001                        #  @anyx            (CA)                 (ASN: OVH SAS)
-p2p-seed-node = seed.thecryptodrive.com:2001        #  @thecryptodrive  (DE, Esslingen)      (ASN: Hetzner Online GmbH)
-p2p-seed-node = seed.buildteam.io:2001              #  @buildteam       (DE)                 (ASN: Hetzner Online GmbH)
-p2p-seed-node = seed.hivekings.com:2001             #  @drakos          (DE, Nuremberg)      (ASN: Contabo GmbH)
-p2p-seed-node = gtg.steem.house:2001                #  @gtg             (PL)                 (ASN: OVH SAS)
-p2p-seed-node = seed.openhive.network:2001          #  @gtg             (PL)                 (ASN: OVH SAS)
-p2p-seed-node = seed.roelandp.nl:2001               #  @roelandp        (FI, Helsinki)       (ASN: Hetzner Online GmbH)
-p2p-seed-node = node.mahdiyari.info:2001            #  @mahdiyari       (FI, Helsinki)       (ASN: Hetzner Online GmbH)
-p2p-seed-node = hived.hive-engine.com:2001          #  @aggroed         (FI)                 (ASN: Hetzner Online GmbH)
-p2p-seed-node = hived.splinterlands.com:2001        #  @aggroed         (FI)                 (ASN: Hetzner Online GmbH)
-p2p-seed-node = rpc.ausbit.dev:2001                 #  @ausbitbank      (FI, Tuusula)        (ASN: Hetzner Online GmbH)
-p2p-seed-node = seed.chitty.me:2001                 #  @chitty          (FI)                 (ASN: Hetzner Online GmbH)
-p2p-seed-node = hiveseed-fin.privex.io:2001         #  @privex          (FI, Helsinki)       (ASN: Hetzner Online GmbH)
-p2p-seed-node = seed.liondani.com:2016              #  @liondani        (GB, Maidstone)      (ASN: HostDime.com, Inc.)
-p2p-seed-node = hiveseed-se.privex.io:2001          #  @privex          (SE, Stockholm)      (ASN: Privex Inc.)
-
+p2p-seed-node = lafonasteem.com:2001                # @lafona (FR)
+p2p-seed-node = seed.esteem.ws:2001                 # @good-karma (FI)
+#p2p-seed-node = 176.31.126.187:2001                 # @timcliff (FR)
+p2p-seed-node = seed.thecryptodrive.com:2001        # @thecryptodrive (FI)
+p2p-seed-node = 104.199.118.92:2001                 # @clayop (US?)
+p2p-seed-node = steem-seed.lukestokes.info:2001     # @lukestokes (SE)
+p2p-seed-node = node.mahdiyari.info:2001            # @mahdiyari (FI)
+p2p-seed-node = steemseed-se.privex.io:2001         # @privex (SE)
+p2p-seed-node = seed.steemmonsters.com:2001         # @aggroed (SE)
+p2p-seed-node = sn1.steemit.com:2001                # @steemit Steemit Inc.
+p2p-seed-node = sn2.steemit.com:2001                # @steemit Steemit Inc.
+p2p-seed-node = sn3.steemit.com:2001                # @steemit Steemit Inc.
+p2p-seed-node = sn4.steemit.com:2001                # @steemit Steemit Inc.
+p2p-seed-node = sn5.steemit.com:2001                # @steemit Steemit Inc.
 
 # Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.
 # checkpoint =
